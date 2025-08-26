@@ -107,6 +107,43 @@ function toWeightedIterator<TEntry>(
   };
 }
 
+type PeekableAsyncIterable<T> = AsyncIterable<T> & {
+  peek: () => Promise<IteratorResult<T>>;
+};
+
+/**
+ * Adds a `peek` method to `AsyncIterable<T>`, which
+ * peeks at the next element in the iterable without consuming it.
+ */
+export const peekable = <TEntry>(
+  iterable: Iterable<TEntry> | AsyncIterable<TEntry>
+): PeekableAsyncIterable<TEntry> => {
+  const iterator: Iterator<TEntry> | AsyncIterator<TEntry, TEntry> = (
+    (iterable as Iterable<TEntry>)[Symbol.iterator] ||
+    (iterable as AsyncIterable<TEntry>)[Symbol.asyncIterator]
+  ).call(iterable);
+  let nextElPromise: IteratorResult<TEntry> | Promise<IteratorResult<TEntry>> = iterator.next();
+
+  const it: PeekableAsyncIterable<TEntry> = (async function* () {
+    let nonEmpty: boolean = true;
+    while (nonEmpty) {
+      const result: IteratorResult<TEntry> = await nextElPromise;
+      nonEmpty = !result.done;
+      if (nonEmpty) {
+        // eslint-disable-next-line require-atomic-updates
+        nextElPromise = iterator.next();
+        yield result.value;
+      }
+    }
+  })() as unknown as PeekableAsyncIterable<TEntry>;
+
+  it.peek = async () => {
+    return await nextElPromise;
+  };
+
+  return it;
+};
+
 /**
  * Utilities for parallel asynchronous operations, for use with the system `Promise` APIs.
  *
@@ -194,9 +231,10 @@ export class Async {
         options?.concurrency && options.concurrency > 0 ? options.concurrency : Infinity;
       let concurrentUnitsInProgress: number = 0;
 
-      const iterator: Iterator<TEntry> | AsyncIterator<TEntry> = (iterable as AsyncIterable<TEntry>)[
+      const peekableIterable: PeekableAsyncIterable<TEntry> = peekable(iterable);
+      const iterator: Iterator<TEntry> | AsyncIterator<TEntry> = (peekableIterable as AsyncIterable<TEntry>)[
         Symbol.asyncIterator
-      ].call(iterable);
+      ].call(peekableIterable);
 
       let arrayIndex: number = 0;
       let iteratorIsComplete: boolean = false;
@@ -213,12 +251,42 @@ export class Async {
           //  there will be effectively no cap on the number of operations waiting.
           const limitedConcurrency: number = !Number.isFinite(concurrency) ? 1 : concurrency;
           concurrentUnitsInProgress += limitedConcurrency;
+          const nextIteratorItem: IteratorResult<TEntry> = await peekableIterable.peek();
+          concurrentUnitsInProgress -= limitedConcurrency;
+          if (!nextIteratorItem.done) {
+            const nextIteratorValue: TEntry = nextIteratorItem.value;
+            console.log(
+              `Next iterator result: ${JSON.stringify(Object.keys(nextIteratorValue.element as any))}`
+            );
+            console.log(
+              `Next iterator result: ${JSON.stringify((nextIteratorValue.element as any)._taskName)}`
+            );
+            Async.validateWeightedIterable(nextIteratorValue);
+            // Cap the weight to concurrency, this allows 0 weight items to execute despite the concurrency limit.
+            const weight: number = Math.min(nextIteratorValue.weight, concurrency);
+            if (concurrentUnitsInProgress + weight > concurrency) {
+              console.log(
+                `Skipping operation with weight ${weight} because it would exceed the concurrency limit of ${concurrency}.`
+              );
+              await onOperationCompletionAsync();
+              break; // No more operations can be queued, wait for one to finish
+            }
+          }
+          concurrentUnitsInProgress += limitedConcurrency;
           const currentIteratorResult: IteratorResult<TEntry> = await iterator.next();
+          concurrentUnitsInProgress -= limitedConcurrency;
           // eslint-disable-next-line require-atomic-updates
           iteratorIsComplete = !!currentIteratorResult.done;
+          console.log(`Iterator is complete: ${iteratorIsComplete}`);
 
           if (!iteratorIsComplete) {
             const currentIteratorValue: TEntry = currentIteratorResult.value;
+            console.log(
+              `Current iterator result: ${JSON.stringify(Object.keys(currentIteratorValue.element as any))}`
+            );
+            console.log(
+              `Current iterator result: ${JSON.stringify((currentIteratorValue.element as any)._taskName)}`
+            );
             Async.validateWeightedIterable(currentIteratorValue);
             // Cap the weight to concurrency, this allows 0 weight items to execute despite the concurrency limit.
             const weight: number = Math.min(currentIteratorValue.weight, concurrency);
@@ -226,10 +294,10 @@ export class Async {
             // Remove the "lock" from the concurrency check and only apply the current weight.
             //  This should allow other operations to execute.
             concurrentUnitsInProgress += weight;
-            concurrentUnitsInProgress -= limitedConcurrency;
 
             Promise.resolve(callback(currentIteratorValue.element, arrayIndex++))
               .then(async () => {
+                console.log(`Finished processing item ${(currentIteratorValue.element as any)._taskName}.`);
                 // Remove the operation completely from the in progress units.
                 concurrentUnitsInProgress -= weight;
                 await onOperationCompletionAsync();
@@ -253,6 +321,7 @@ export class Async {
         if (!promiseHasResolvedOrRejected) {
           if (concurrentUnitsInProgress === 0 && iteratorIsComplete) {
             promiseHasResolvedOrRejected = true;
+            console.log(`All operations complete.`);
             resolve();
           } else if (!iteratorIsComplete) {
             await queueOperationsAsync();

@@ -82,6 +82,7 @@ export class InternalHeftSession {
     await Async.forEachAsync(
       tasks,
       async (task: HeftTask) => {
+        console.log('Initializing task:', task.taskName);
         await task.ensureInitializedAsync();
       },
       { concurrency: Constants.maxParallelism }

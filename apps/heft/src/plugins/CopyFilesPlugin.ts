@@ -133,6 +133,7 @@ async function _getCopyDescriptorsAsync(
   await Async.forEachAsync(
     copyConfigurations,
     async (copyConfiguration: ICopyOperation) => {
+      console.log(`Copying files for configuration: ${JSON.stringify(copyConfiguration)}`);
       // "sourcePath" is required to be a folder. To copy a single file, put the parent folder in "sourcePath"
       // and the filename in "includeGlobs".
       const sourceFolder: string = copyConfiguration.sourcePath!;

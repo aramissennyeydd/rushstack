@@ -12,9 +12,9 @@
   "types": "dist/heft-typescript-plugin.d.ts",
   "license": "MIT",
   "scripts": {
-    "build": "heft test --clean",
+    "build": "heft --debug test --clean",
     "start": "heft build-watch",
-    "_phase:build": "heft run --only build -- --clean"
+    "_phase:build": "heft --debug run --only build -- --clean"
   },
   "peerDependencies": {
     "@rushstack/heft": "0.74.2"

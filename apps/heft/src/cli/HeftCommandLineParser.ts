@@ -239,6 +239,7 @@ export class HeftCommandLineParser extends CommandLineParser {
   }
 
   private async _reportErrorAndSetExitCodeAsync(error: Error): Promise<void> {
+    console.error(error);
     if (!(error instanceof AlreadyReportedError)) {
       this.globalTerminal.writeErrorLine(error.toString());
     }

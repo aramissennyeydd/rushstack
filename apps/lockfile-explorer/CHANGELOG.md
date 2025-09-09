@@ -1,6 +1,399 @@
 # Change Log - @rushstack/lockfile-explorer
 
-This log was last generated on Tue, 05 Mar 2024 01:19:24 GMT and should not be manually modified.
+This log was last generated on Fri, 01 Aug 2025 00:12:49 GMT and should not be manually modified.
+
+## 1.7.39
+Fri, 01 Aug 2025 00:12:49 GMT
+
+_Version update only_
+
+## 1.7.38
+Wed, 23 Jul 2025 20:55:57 GMT
+
+_Version update only_
+
+## 1.7.37
+Sat, 21 Jun 2025 00:13:15 GMT
+
+_Version update only_
+
+## 1.7.36
+Tue, 13 May 2025 02:09:20 GMT
+
+_Version update only_
+
+## 1.7.35
+Thu, 01 May 2025 15:11:33 GMT
+
+_Version update only_
+
+## 1.7.34
+Thu, 01 May 2025 00:11:12 GMT
+
+_Version update only_
+
+## 1.7.33
+Fri, 25 Apr 2025 00:11:32 GMT
+
+_Version update only_
+
+## 1.7.32
+Mon, 21 Apr 2025 22:24:25 GMT
+
+_Version update only_
+
+## 1.7.31
+Thu, 17 Apr 2025 00:11:21 GMT
+
+### Patches
+
+- Update documentation for `extends`
+
+## 1.7.30
+Tue, 15 Apr 2025 15:11:58 GMT
+
+_Version update only_
+
+## 1.7.29
+Wed, 09 Apr 2025 00:11:03 GMT
+
+_Version update only_
+
+## 1.7.28
+Fri, 04 Apr 2025 18:34:35 GMT
+
+_Version update only_
+
+## 1.7.27
+Tue, 25 Mar 2025 15:11:16 GMT
+
+_Version update only_
+
+## 1.7.26
+Wed, 12 Mar 2025 22:41:36 GMT
+
+_Version update only_
+
+## 1.7.25
+Wed, 12 Mar 2025 00:11:32 GMT
+
+_Version update only_
+
+## 1.7.24
+Tue, 11 Mar 2025 02:12:34 GMT
+
+_Version update only_
+
+## 1.7.23
+Tue, 11 Mar 2025 00:11:25 GMT
+
+_Version update only_
+
+## 1.7.22
+Sat, 01 Mar 2025 05:00:09 GMT
+
+_Version update only_
+
+## 1.7.21
+Thu, 27 Feb 2025 01:10:39 GMT
+
+_Version update only_
+
+## 1.7.20
+Wed, 26 Feb 2025 16:11:12 GMT
+
+_Version update only_
+
+## 1.7.19
+Sat, 22 Feb 2025 01:11:12 GMT
+
+_Version update only_
+
+## 1.7.18
+Wed, 19 Feb 2025 18:53:48 GMT
+
+_Version update only_
+
+## 1.7.17
+Wed, 12 Feb 2025 01:10:52 GMT
+
+_Version update only_
+
+## 1.7.16
+Thu, 30 Jan 2025 16:10:36 GMT
+
+_Version update only_
+
+## 1.7.15
+Thu, 30 Jan 2025 01:11:42 GMT
+
+_Version update only_
+
+## 1.7.14
+Thu, 09 Jan 2025 01:10:10 GMT
+
+_Version update only_
+
+## 1.7.13
+Tue, 07 Jan 2025 22:17:32 GMT
+
+_Version update only_
+
+## 1.7.12
+Sat, 14 Dec 2024 01:11:07 GMT
+
+_Version update only_
+
+## 1.7.11
+Mon, 09 Dec 2024 20:31:43 GMT
+
+_Version update only_
+
+## 1.7.10
+Tue, 03 Dec 2024 16:11:08 GMT
+
+_Version update only_
+
+## 1.7.9
+Sat, 23 Nov 2024 01:18:55 GMT
+
+_Version update only_
+
+## 1.7.8
+Fri, 22 Nov 2024 01:10:43 GMT
+
+_Version update only_
+
+## 1.7.7
+Thu, 24 Oct 2024 00:15:48 GMT
+
+_Version update only_
+
+## 1.7.6
+Mon, 21 Oct 2024 18:50:10 GMT
+
+_Version update only_
+
+## 1.7.5
+Thu, 17 Oct 2024 08:35:06 GMT
+
+_Version update only_
+
+## 1.7.4
+Tue, 15 Oct 2024 00:12:31 GMT
+
+_Version update only_
+
+## 1.7.3
+Wed, 02 Oct 2024 00:11:19 GMT
+
+_Version update only_
+
+## 1.7.2
+Tue, 01 Oct 2024 00:11:28 GMT
+
+_Version update only_
+
+## 1.7.1
+Mon, 30 Sep 2024 15:12:19 GMT
+
+_Version update only_
+
+## 1.7.0
+Thu, 26 Sep 2024 21:47:44 GMT
+
+### Minor changes
+
+- Update to use a new API from rush-sdk.
+
+## 1.6.0
+Tue, 24 Sep 2024 00:11:19 GMT
+
+### Minor changes
+
+- Bump express dependency to 4.20.0
+
+## 1.5.11
+Fri, 13 Sep 2024 00:11:43 GMT
+
+_Version update only_
+
+## 1.5.10
+Tue, 10 Sep 2024 20:08:11 GMT
+
+_Version update only_
+
+## 1.5.9
+Wed, 21 Aug 2024 05:43:04 GMT
+
+_Version update only_
+
+## 1.5.8
+Mon, 12 Aug 2024 22:16:04 GMT
+
+_Version update only_
+
+## 1.5.7
+Fri, 02 Aug 2024 17:26:42 GMT
+
+_Version update only_
+
+## 1.5.6
+Sat, 27 Jul 2024 00:10:27 GMT
+
+### Patches
+
+- Include CHANGELOG.md in published releases again
+
+## 1.5.5
+Wed, 24 Jul 2024 00:12:14 GMT
+
+_Version update only_
+
+## 1.5.4
+Wed, 17 Jul 2024 06:55:09 GMT
+
+_Version update only_
+
+## 1.5.3
+Wed, 17 Jul 2024 00:11:19 GMT
+
+_Version update only_
+
+## 1.5.2
+Tue, 16 Jul 2024 00:36:22 GMT
+
+_Version update only_
+
+## 1.5.1
+Thu, 27 Jun 2024 21:01:36 GMT
+
+_Version update only_
+
+## 1.5.0
+Tue, 25 Jun 2024 06:01:28 GMT
+
+### Minor changes
+
+- Add new "lockfile-lint" command
+
+## 1.4.17
+Mon, 03 Jun 2024 23:43:15 GMT
+
+_Version update only_
+
+## 1.4.16
+Thu, 30 May 2024 00:13:05 GMT
+
+_Version update only_
+
+## 1.4.15
+Wed, 29 May 2024 02:03:51 GMT
+
+_Version update only_
+
+## 1.4.14
+Wed, 29 May 2024 00:10:52 GMT
+
+_Version update only_
+
+## 1.4.13
+Tue, 28 May 2024 15:10:09 GMT
+
+_Version update only_
+
+## 1.4.12
+Tue, 28 May 2024 00:09:47 GMT
+
+_Version update only_
+
+## 1.4.11
+Sat, 25 May 2024 04:54:07 GMT
+
+_Version update only_
+
+## 1.4.10
+Fri, 24 May 2024 00:15:08 GMT
+
+_Version update only_
+
+## 1.4.9
+Thu, 23 May 2024 02:26:56 GMT
+
+_Version update only_
+
+## 1.4.8
+Thu, 16 May 2024 15:10:22 GMT
+
+_Version update only_
+
+## 1.4.7
+Wed, 15 May 2024 23:42:58 GMT
+
+_Version update only_
+
+## 1.4.6
+Wed, 15 May 2024 15:09:57 GMT
+
+### Patches
+
+- Update the exit code to 0 for `lockfile-explorer --help`.
+
+## 1.4.5
+Wed, 15 May 2024 06:04:17 GMT
+
+_Version update only_
+
+## 1.4.4
+Wed, 15 May 2024 03:05:43 GMT
+
+### Patches
+
+- Fix some issues when parsing certain lockfile syntaxes
+
+## 1.4.3
+Fri, 10 May 2024 05:33:34 GMT
+
+_Version update only_
+
+## 1.4.2
+Wed, 08 May 2024 22:23:51 GMT
+
+_Version update only_
+
+## 1.4.1
+Mon, 06 May 2024 15:11:04 GMT
+
+_Version update only_
+
+## 1.4.0
+Tue, 30 Apr 2024 05:42:40 GMT
+
+### Minor changes
+
+- Add `--subspace` command-line parameter to support Rush subspaces
+
+## 1.3.1
+Wed, 10 Apr 2024 15:10:09 GMT
+
+_Version update only_
+
+## 1.3.0
+Tue, 02 Apr 2024 00:09:59 GMT
+
+### Minor changes
+
+- Bump express.
+
+## 1.2.39
+Tue, 19 Mar 2024 15:10:18 GMT
+
+_Version update only_
+
+## 1.2.38
+Fri, 15 Mar 2024 00:12:40 GMT
+
+_Version update only_
 
 ## 1.2.37
 Tue, 05 Mar 2024 01:19:24 GMT

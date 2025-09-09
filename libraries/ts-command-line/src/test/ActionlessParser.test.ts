@@ -3,9 +3,10 @@
 
 import { CommandLineParser } from '../providers/CommandLineParser';
 import type { CommandLineFlagParameter } from '../parameters/CommandLineFlagParameter';
+import { ensureHelpTextMatchesSnapshot } from './helpTestUtilities';
 
 class TestCommandLine extends CommandLineParser {
-  public flag!: CommandLineFlagParameter;
+  public flag: CommandLineFlagParameter;
   public done: boolean = false;
 
   public constructor() {
@@ -13,26 +14,29 @@ class TestCommandLine extends CommandLineParser {
       toolFilename: 'example',
       toolDescription: 'An example project'
     });
-  }
 
-  protected async onExecute(): Promise<void> {
-    await super.onExecute();
-    this.done = true;
-  }
-
-  protected onDefineParameters(): void {
     this.flag = this.defineFlagParameter({
       parameterLongName: '--flag',
       description: 'The flag'
     });
   }
+
+  protected override async onExecuteAsync(): Promise<void> {
+    await super.onExecuteAsync();
+    this.done = true;
+  }
 }
 
 describe(`Actionless ${CommandLineParser.name}`, () => {
+  it('renders help text', () => {
+    const commandLineParser: TestCommandLine = new TestCommandLine();
+    ensureHelpTextMatchesSnapshot(commandLineParser);
+  });
+
   it('parses an empty arg list', async () => {
     const commandLineParser: TestCommandLine = new TestCommandLine();
 
-    await commandLineParser.execute([]);
+    await commandLineParser.executeAsync([]);
 
     expect(commandLineParser.done).toBe(true);
     expect(commandLineParser.selectedAction).toBeUndefined();
@@ -42,7 +46,7 @@ describe(`Actionless ${CommandLineParser.name}`, () => {
   it('parses a flag', async () => {
     const commandLineParser: TestCommandLine = new TestCommandLine();
 
-    await commandLineParser.execute(['--flag']);
+    await commandLineParser.executeAsync(['--flag']);
 
     expect(commandLineParser.done).toBe(true);
     expect(commandLineParser.selectedAction).toBeUndefined();
@@ -56,7 +60,7 @@ describe(`Actionless ${CommandLineParser.name}`, () => {
       description: 'remainder description'
     });
 
-    await commandLineParser.execute(['--flag', 'the', 'remaining', 'args']);
+    await commandLineParser.executeAsync(['--flag', 'the', 'remaining', 'args']);
 
     expect(commandLineParser.done).toBe(true);
     expect(commandLineParser.selectedAction).toBeUndefined();

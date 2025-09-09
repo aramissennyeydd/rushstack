@@ -4,6 +4,7 @@
 import { DynamicCommandLineParser } from '../providers/DynamicCommandLineParser';
 import { DynamicCommandLineAction } from '../providers/DynamicCommandLineAction';
 import type { CommandLineFlagParameter } from '../parameters/CommandLineFlagParameter';
+import { ensureHelpTextMatchesSnapshot } from './helpTestUtilities';
 
 describe(DynamicCommandLineParser.name, () => {
   it('parses an action', async () => {
@@ -23,7 +24,9 @@ describe(DynamicCommandLineParser.name, () => {
       description: 'The flag'
     });
 
-    await commandLineParser.execute(['do:the-job', '--flag']);
+    ensureHelpTextMatchesSnapshot(commandLineParser);
+
+    await commandLineParser.executeAsync(['do:the-job', '--flag']);
 
     expect(commandLineParser.selectedAction).toEqual(action);
 

@@ -6,16 +6,16 @@ import {
   AsyncSeriesBailHook,
   AsyncSeriesHook,
   AsyncSeriesWaterfallHook,
-  SyncHook
+  SyncHook,
+  SyncWaterfallHook
 } from 'tapable';
-
 import type { CommandLineParameter } from '@rushstack/ts-command-line';
+
 import type { BuildCacheConfiguration } from '../api/BuildCacheConfiguration';
 import type { IPhase } from '../api/CommandLineConfiguration';
 import type { RushConfiguration } from '../api/RushConfiguration';
 import type { RushConfigurationProject } from '../api/RushConfigurationProject';
 import type { Operation } from '../logic/operations/Operation';
-import type { ProjectChangeAnalyzer } from '../logic/ProjectChangeAnalyzer';
 import type {
   IExecutionResult,
   IOperationExecutionResult
@@ -25,6 +25,8 @@ import type { RushProjectConfiguration } from '../api/RushProjectConfiguration';
 import type { IOperationRunnerContext } from '../logic/operations/IOperationRunner';
 import type { ITelemetryData } from '../logic/Telemetry';
 import type { OperationStatus } from '../logic/operations/OperationStatus';
+import type { IInputsSnapshot } from '../logic/incremental/InputsSnapshot';
+import type { IEnvironment } from '../utilities/Utilities';
 
 /**
  * A plugin that interacts with a phased commands.
@@ -46,6 +48,12 @@ export interface ICreateOperationsContext {
    * The configuration for the build cache, if the feature is enabled.
    */
   readonly buildCacheConfiguration: BuildCacheConfiguration | undefined;
+  /**
+   * If true, for an incremental build, Rush will only include projects with immediate changes or projects with no consumers.
+   * @remarks
+   * This is an optimization that may produce invalid outputs if some of the intervening projects are impacted by the changes.
+   */
+  readonly changedProjectsOnly: boolean;
   /**
    * The configuration for the cobuild, if cobuild feature and build cache feature are both enabled.
    */
@@ -70,6 +78,10 @@ export interface ICreateOperationsContext {
    */
   readonly isWatch: boolean;
   /**
+   * The currently configured maximum parallelism for the command.
+   */
+  readonly parallelism: number;
+  /**
    * The set of phases original for the current command execution.
    */
   readonly phaseOriginal: ReadonlySet<IPhase>;
@@ -77,10 +89,6 @@ export interface ICreateOperationsContext {
    * The set of phases selected for the current command execution.
    */
   readonly phaseSelection: ReadonlySet<IPhase>;
-  /**
-   * The current state of the repository
-   */
-  readonly projectChangeAnalyzer: ProjectChangeAnalyzer;
   /**
    * The set of Rush projects selected for the current command execution.
    */
@@ -99,11 +107,30 @@ export interface ICreateOperationsContext {
    */
   readonly rushConfiguration: RushConfiguration;
   /**
+   * If true, Rush will automatically include the dependent phases for the specified set of phases.
+   * @remarks
+   * If the selection of projects was "unsafe" (i.e. missing some dependencies), this will add the
+   * minimum number of phases required to make it safe.
+   */
+  readonly includePhaseDeps: boolean;
+  /**
    * Marks an operation's result as invalid, potentially triggering a new build. Only applicable in watch mode.
    * @param operation - The operation to invalidate
    * @param reason - The reason for invalidating the operation
    */
   readonly invalidateOperation?: ((operation: Operation, reason: string) => void) | undefined;
+}
+
+/**
+ * Context used for executing operations.
+ * @alpha
+ */
+export interface IExecuteOperationsContext extends ICreateOperationsContext {
+  /**
+   * The current state of the repository, if available.
+   * Not part of the creation context to avoid the overhead of Git calls when initializing the graph.
+   */
+  readonly inputsSnapshot?: IInputsSnapshot;
 }
 
 /**
@@ -123,7 +150,7 @@ export class PhasedCommandHooks {
    * Hook is series for stable output.
    */
   public readonly beforeExecuteOperations: AsyncSeriesHook<
-    [Map<Operation, IOperationExecutionResult>, ICreateOperationsContext]
+    [Map<Operation, IOperationExecutionResult>, IExecuteOperationsContext]
   > = new AsyncSeriesHook(['records', 'context']);
 
   /**
@@ -137,7 +164,7 @@ export class PhasedCommandHooks {
    * Use the context to distinguish between the initial run and phased runs.
    * Hook is series for stable output.
    */
-  public readonly afterExecuteOperations: AsyncSeriesHook<[IExecutionResult, ICreateOperationsContext]> =
+  public readonly afterExecuteOperations: AsyncSeriesHook<[IExecutionResult, IExecuteOperationsContext]> =
     new AsyncSeriesHook(['results', 'context']);
 
   /**
@@ -147,6 +174,14 @@ export class PhasedCommandHooks {
     [IOperationRunnerContext & IOperationExecutionResult],
     OperationStatus | undefined
   > = new AsyncSeriesBailHook(['runnerContext'], 'beforeExecuteOperation');
+
+  /**
+   * Hook invoked to define environment variables for an operation.
+   * May be invoked by the runner to get the environment for the operation.
+   */
+  public readonly createEnvironmentForOperation: SyncWaterfallHook<
+    [IEnvironment, IOperationRunnerContext & IOperationExecutionResult]
+  > = new SyncWaterfallHook(['environment', 'runnerContext'], 'createEnvironmentForOperation');
 
   /**
    * Hook invoked after executing a operation.

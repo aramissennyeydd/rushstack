@@ -22,7 +22,7 @@ interface ISerializedOperation {
 
 function serializeOperation(operation: Operation): ISerializedOperation {
   return {
-    name: operation.name!,
+    name: operation.name,
     commandToRun: operation.runner!.getConfigHash()
   };
 }
@@ -46,12 +46,17 @@ describe(ShellOperationRunnerPlugin.name, () => {
 
     const fakeCreateOperationsContext: Pick<
       ICreateOperationsContext,
-      'phaseOriginal' | 'phaseSelection' | 'projectSelection' | 'projectsInUnknownState'
+      | 'phaseOriginal'
+      | 'phaseSelection'
+      | 'projectSelection'
+      | 'projectsInUnknownState'
+      | 'projectConfigurations'
     > = {
       phaseOriginal: echoCommand.phases,
       phaseSelection: echoCommand.phases,
       projectSelection: new Set(rushConfiguration.projects),
-      projectsInUnknownState: new Set(rushConfiguration.projects)
+      projectsInUnknownState: new Set(rushConfiguration.projects),
+      projectConfigurations: new Map()
     };
 
     const hooks: PhasedCommandHooks = new PhasedCommandHooks();
@@ -89,12 +94,17 @@ describe(ShellOperationRunnerPlugin.name, () => {
 
     const fakeCreateOperationsContext: Pick<
       ICreateOperationsContext,
-      'phaseOriginal' | 'phaseSelection' | 'projectSelection' | 'projectsInUnknownState'
+      | 'phaseOriginal'
+      | 'phaseSelection'
+      | 'projectSelection'
+      | 'projectsInUnknownState'
+      | 'projectConfigurations'
     > = {
       phaseOriginal: echoCommand.phases,
       phaseSelection: echoCommand.phases,
       projectSelection: new Set(rushConfiguration.projects),
-      projectsInUnknownState: new Set(rushConfiguration.projects)
+      projectsInUnknownState: new Set(rushConfiguration.projects),
+      projectConfigurations: new Map()
     };
 
     const hooks: PhasedCommandHooks = new PhasedCommandHooks();

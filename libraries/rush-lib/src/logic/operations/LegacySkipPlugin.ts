@@ -3,19 +3,18 @@
 
 import path from 'node:path';
 
-import { Async, FileSystem, JsonFile, type JsonObject } from '@rushstack/node-core-library';
+import { FileSystem, JsonFile, type JsonObject } from '@rushstack/node-core-library';
 import { PrintUtilities, Colorize, type ITerminal } from '@rushstack/terminal';
 
 import type { Operation } from './Operation';
 import { OperationStatus } from './OperationStatus';
 import type {
-  ICreateOperationsContext,
+  IExecuteOperationsContext,
   IPhasedCommandPlugin,
   PhasedCommandHooks
 } from '../../pluginFramework/PhasedCommandHooks';
 import type { IOperationRunnerContext } from './IOperationRunner';
 import type { IOperationExecutionResult } from './IOperationExecutionResult';
-import type { ProjectChangeAnalyzer } from '../ProjectChangeAnalyzer';
 
 const PLUGIN_NAME: 'LegacySkipPlugin' = 'LegacySkipPlugin';
 
@@ -64,30 +63,23 @@ export class LegacySkipPlugin implements IPhasedCommandPlugin {
   public apply(hooks: PhasedCommandHooks): void {
     const stateMap: WeakMap<Operation, ILegacySkipRecord> = new WeakMap();
 
-    let projectChangeAnalyzer!: ProjectChangeAnalyzer;
-
     const { terminal, changedProjectsOnly, isIncrementalBuildAllowed, allowWarningsInSuccessfulBuild } =
       this._options;
 
-    hooks.createOperations.tap(
+    hooks.beforeExecuteOperations.tap(
       PLUGIN_NAME,
-      (operations: Set<Operation>, context: ICreateOperationsContext): Set<Operation> => {
-        projectChangeAnalyzer = context.projectChangeAnalyzer;
-
-        return operations;
-      }
-    );
-
-    hooks.beforeExecuteOperations.tapPromise(
-      PLUGIN_NAME,
-      async (operations: ReadonlyMap<Operation, IOperationExecutionResult>): Promise<void> => {
+      (
+        operations: ReadonlyMap<Operation, IOperationExecutionResult>,
+        context: IExecuteOperationsContext
+      ): void => {
         let logGitWarning: boolean = false;
+        const { inputsSnapshot } = context;
 
-        await Async.forEachAsync(operations.values(), async (record: IOperationExecutionResult) => {
+        for (const record of operations.values()) {
           const { operation } = record;
-          const { associatedProject, associatedPhase, runner } = operation;
-          if (!associatedProject || !associatedPhase || !runner) {
-            return;
+          const { associatedProject, associatedPhase, runner, logFilenameIdentifier } = operation;
+          if (!runner) {
+            continue;
           }
 
           if (!runner.cacheable) {
@@ -96,10 +88,10 @@ export class LegacySkipPlugin implements IPhasedCommandPlugin {
               packageDeps: undefined,
               packageDepsPath: ''
             });
-            return;
+            continue;
           }
 
-          const packageDepsFilename: string = `package-deps_${associatedPhase.logFilenameIdentifier}.json`;
+          const packageDepsFilename: string = `package-deps_${logFilenameIdentifier}.json`;
 
           const packageDepsPath: string = path.join(
             associatedProject.projectRushTempFolder,
@@ -109,12 +101,12 @@ export class LegacySkipPlugin implements IPhasedCommandPlugin {
           let packageDeps: IProjectDeps | undefined;
 
           try {
-            const fileHashes: Map<string, string> | undefined =
-              await projectChangeAnalyzer._tryGetProjectDependenciesAsync(associatedProject, terminal);
+            const fileHashes: ReadonlyMap<string, string> | undefined =
+              inputsSnapshot?.getTrackedFileHashesForOperation(associatedProject, associatedPhase.name);
 
             if (!fileHashes) {
               logGitWarning = true;
-              return;
+              continue;
             }
 
             const files: Record<string, string> = {};
@@ -143,7 +135,7 @@ export class LegacySkipPlugin implements IPhasedCommandPlugin {
             packageDeps,
             allowSkip: isIncrementalBuildAllowed
           });
-        });
+        }
 
         if (logGitWarning) {
           // To test this code path:
@@ -210,7 +202,7 @@ export class LegacySkipPlugin implements IPhasedCommandPlugin {
         }
 
         // TODO: Remove legacyDepsPath with the next major release of Rush
-        const legacyDepsPath: string = path.join(associatedProject!.projectFolder, 'package-deps.json');
+        const legacyDepsPath: string = path.join(associatedProject.projectFolder, 'package-deps.json');
 
         await Promise.all([
           // Delete the legacy package-deps.json

@@ -8,6 +8,7 @@ import type { CommandLineParameterProvider } from '../providers/CommandLineParam
 import { AliasCommandLineAction } from '../providers/AliasCommandLineAction';
 import { CommandLineAction } from '../providers/CommandLineAction';
 import type { CommandLineFlagParameter } from '../parameters/CommandLineFlagParameter';
+import { ensureHelpTextMatchesSnapshot } from './helpTestUtilities';
 
 class TestAliasAction extends AliasCommandLineAction {
   public done: boolean = false;
@@ -32,26 +33,24 @@ class TestAction extends CommandLineAction {
       summary: 'does the action',
       documentation: 'a longer description'
     });
-  }
 
-  protected async onExecute(): Promise<void> {
-    expect(this._flag.value).toEqual(true);
-    this.done = true;
-  }
-
-  protected onDefineParameters(): void {
     this._flag = this.defineFlagParameter({
       parameterLongName: '--flag',
       description: 'The flag'
     });
+  }
+
+  protected override async onExecuteAsync(): Promise<void> {
+    expect(this._flag.value).toEqual(true);
+    this.done = true;
   }
 }
 
 class TestScopedAction extends ScopedCommandLineAction {
   public done: boolean = false;
   public scopedValue: string | undefined;
-  private _verboseArg!: CommandLineFlagParameter;
-  private _scopeArg!: CommandLineStringParameter;
+  private readonly _verboseArg: CommandLineFlagParameter;
+  private readonly _scopeArg: CommandLineStringParameter;
   private _scopedArg: CommandLineStringParameter | undefined;
 
   public constructor() {
@@ -60,17 +59,7 @@ class TestScopedAction extends ScopedCommandLineAction {
       summary: 'does the scoped action',
       documentation: 'a longer description'
     });
-  }
 
-  protected async onExecute(): Promise<void> {
-    if (this._scopedArg) {
-      expect(this._scopedArg.longName).toBe(`--scoped-${this._scopeArg.value}`);
-      this.scopedValue = this._scopedArg.value;
-    }
-    this.done = true;
-  }
-
-  protected onDefineUnscopedParameters(): void {
     this._verboseArg = this.defineFlagParameter({
       parameterLongName: '--verbose',
       description: 'A flag parameter.'
@@ -82,6 +71,14 @@ class TestScopedAction extends ScopedCommandLineAction {
       argumentName: 'SCOPE',
       description: 'The scope'
     });
+  }
+
+  protected override async onExecuteAsync(): Promise<void> {
+    if (this._scopedArg) {
+      expect(this._scopedArg.longName).toBe(`--scoped-${this._scopeArg.value}`);
+      this.scopedValue = this._scopedArg.value;
+    }
+    this.done = true;
   }
 
   protected onDefineScopedParameters(scopedParameterProvider: CommandLineParameterProvider): void {
@@ -108,13 +105,18 @@ class TestCommandLine extends CommandLineParser {
 }
 
 describe(AliasCommandLineAction.name, () => {
+  it('renders help text', () => {
+    const commandLineParser: TestCommandLine = new TestCommandLine();
+    ensureHelpTextMatchesSnapshot(commandLineParser);
+  });
+
   it('executes the aliased action', async () => {
     const commandLineParser: TestCommandLine = new TestCommandLine();
     const targetAction: TestAction = commandLineParser.getAction('action') as TestAction;
     const aliasAction: TestAliasAction = new TestAliasAction(targetAction);
     commandLineParser.addAction(aliasAction);
 
-    await commandLineParser.execute(['alias-action', '--flag']);
+    await commandLineParser.executeAsync(['alias-action', '--flag']);
 
     expect(commandLineParser.selectedAction).toBeDefined();
     expect(commandLineParser.selectedAction!.actionName).toEqual('alias-action');
@@ -127,7 +129,7 @@ describe(AliasCommandLineAction.name, () => {
     const aliasAction: TestAliasAction = new TestAliasAction(targetAction, ['--flag']);
     commandLineParser.addAction(aliasAction);
 
-    await commandLineParser.execute(['alias-action']);
+    await commandLineParser.executeAsync(['alias-action']);
 
     expect(commandLineParser.selectedAction).toBeDefined();
     expect(commandLineParser.selectedAction!.actionName).toEqual('alias-action');
@@ -140,7 +142,7 @@ describe(AliasCommandLineAction.name, () => {
     const aliasAction: TestAliasAction = new TestAliasAction(targetAction);
     commandLineParser.addAction(aliasAction);
 
-    await commandLineParser.execute(['alias-action', '--scope', 'foo', '--', '--scoped-foo', 'bar']);
+    await commandLineParser.executeAsync(['alias-action', '--scope', 'foo', '--', '--scoped-foo', 'bar']);
 
     expect(commandLineParser.selectedAction).toBeDefined();
     expect(commandLineParser.selectedAction!.actionName).toEqual('alias-action');
@@ -154,7 +156,7 @@ describe(AliasCommandLineAction.name, () => {
     const aliasAction: TestAliasAction = new TestAliasAction(targetAction, ['--scope', 'foo', '--']);
     commandLineParser.addAction(aliasAction);
 
-    await commandLineParser.execute(['alias-action', '--scoped-foo', 'bar']);
+    await commandLineParser.executeAsync(['alias-action', '--scoped-foo', 'bar']);
 
     expect(commandLineParser.selectedAction).toBeDefined();
     expect(commandLineParser.selectedAction!.actionName).toEqual('alias-action');
@@ -169,7 +171,7 @@ describe(AliasCommandLineAction.name, () => {
     commandLineParser.addAction(aliasAction);
 
     // Execute the parser in order to populate the parameters
-    await commandLineParser.execute(['alias-action', '--flag']);
+    await commandLineParser.executeAsync(['alias-action', '--flag']);
     expect(commandLineParser.selectedAction).toBeDefined();
     expect(commandLineParser.selectedAction!.actionName).toEqual('alias-action');
     const selectedAction: TestAliasAction = commandLineParser.selectedAction as TestAliasAction;
@@ -186,7 +188,7 @@ describe(AliasCommandLineAction.name, () => {
     commandLineParser.addAction(aliasAction);
 
     // Execute the parser in order to populate the parameters
-    await commandLineParser.execute(['alias-action', '--verbose']);
+    await commandLineParser.executeAsync(['alias-action', '--verbose']);
     expect(commandLineParser.selectedAction).toBeDefined();
     expect(commandLineParser.selectedAction!.actionName).toEqual('alias-action');
     const selectedAction: TestAliasAction = commandLineParser.selectedAction as TestAliasAction;
@@ -203,7 +205,7 @@ describe(AliasCommandLineAction.name, () => {
     commandLineParser.addAction(aliasAction);
 
     // Execute the parser in order to populate the parameters
-    await commandLineParser.execute(['alias-action']);
+    await commandLineParser.executeAsync(['alias-action']);
     expect(commandLineParser.selectedAction).toBeDefined();
     expect(commandLineParser.selectedAction!.actionName).toEqual('alias-action');
     const selectedAction: TestAliasAction = commandLineParser.selectedAction as TestAliasAction;
@@ -220,7 +222,7 @@ describe(AliasCommandLineAction.name, () => {
     commandLineParser.addAction(aliasAction);
 
     // Execute the parser in order to populate the parameters
-    await commandLineParser.execute(['alias-action', '--scope', 'foo']);
+    await commandLineParser.executeAsync(['alias-action', '--scope', 'foo']);
     expect(commandLineParser.selectedAction).toBeDefined();
     expect(commandLineParser.selectedAction!.actionName).toEqual('alias-action');
     let selectedAction: TestAliasAction = commandLineParser.selectedAction as TestAliasAction;
@@ -238,7 +240,7 @@ describe(AliasCommandLineAction.name, () => {
     commandLineParser.addAction(aliasAction);
 
     // Execute the parser in order to populate the parameters
-    await commandLineParser.execute(['alias-action', '--scope', 'foo', '--', '--scoped-foo', 'bar']);
+    await commandLineParser.executeAsync(['alias-action', '--scope', 'foo', '--', '--scoped-foo', 'bar']);
     expect(commandLineParser.selectedAction).toBeDefined();
     expect(commandLineParser.selectedAction!.actionName).toEqual('alias-action');
     selectedAction = commandLineParser.selectedAction as TestAliasAction;
@@ -259,7 +261,7 @@ describe(AliasCommandLineAction.name, () => {
     commandLineParser.addAction(aliasAction);
 
     // Execute the parser in order to populate the parameters
-    await commandLineParser.execute(['alias-action']);
+    await commandLineParser.executeAsync(['alias-action']);
     expect(commandLineParser.selectedAction).toBeDefined();
     expect(commandLineParser.selectedAction!.actionName).toEqual('alias-action');
     let selectedAction: TestAliasAction = commandLineParser.selectedAction as TestAliasAction;
@@ -277,7 +279,7 @@ describe(AliasCommandLineAction.name, () => {
     commandLineParser.addAction(aliasAction);
 
     // Execute the parser in order to populate the parameters
-    await commandLineParser.execute(['alias-action', '--scoped-foo', 'bar']);
+    await commandLineParser.executeAsync(['alias-action', '--scoped-foo', 'bar']);
     expect(commandLineParser.selectedAction).toBeDefined();
     expect(commandLineParser.selectedAction!.actionName).toEqual('alias-action');
     selectedAction = commandLineParser.selectedAction as TestAliasAction;

@@ -14,7 +14,6 @@ import type * as RushCommandLine from '@rushstack/ts-command-line';
 declare let ___DEV___: boolean;
 declare const global: NodeJS.Global &
   typeof globalThis & {
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     ___rush___rushLibModule?: typeof RushLib;
   };
 
@@ -120,7 +119,7 @@ export class RushWorkspace {
     return undefined;
   }
 
-  public static async selectWorkspace(): Promise<RushWorkspace | undefined> {
+  public static async selectWorkspaceAsync(): Promise<RushWorkspace | undefined> {
     const Uris: vscode.Uri[] | undefined = await vscode.window.showOpenDialog({
       canSelectFolders: true,
       canSelectFiles: false,

@@ -2,7 +2,8 @@
 // See LICENSE in the project root for license information.
 
 import { createHash } from 'crypto';
-import { cpus } from 'os';
+import os from 'os';
+import type { ResourceLimits } from 'worker_threads';
 
 import serialize from 'serialize-javascript';
 import type { MinifyOptions } from 'terser';
@@ -23,7 +24,7 @@ import type {
 export interface IWorkerPoolMinifierOptions {
   /**
    * Maximum number of worker threads to use. Will never use more than there are modules to process.
-   * Defaults to os.cpus().length
+   * Defaults to os.availableParallelism()
    */
   maxThreads?: number;
   /**
@@ -36,6 +37,11 @@ export interface IWorkerPoolMinifierOptions {
    * If true, log to the console about the minification results.
    */
   verbose?: boolean;
+
+  /**
+   * Optional resource limits for the workers.
+   */
+  workerResourceLimits?: ResourceLimits;
 }
 
 /**
@@ -55,7 +61,12 @@ export class WorkerPoolMinifier implements IModuleMinifier {
   private readonly _activeRequests: Map<string, IModuleMinificationCallback[]>;
 
   public constructor(options: IWorkerPoolMinifierOptions) {
-    const { maxThreads = cpus().length, terserOptions = {}, verbose = false } = options || {};
+    const {
+      maxThreads = os.availableParallelism?.() ?? os.cpus().length,
+      terserOptions = {},
+      verbose = false,
+      workerResourceLimits
+    } = options || {};
 
     const activeRequests: Map<string, IModuleMinificationCallback[]> = new Map();
     const resultCache: Map<string, IModuleMinificationResult> = new Map();
@@ -63,7 +74,8 @@ export class WorkerPoolMinifier implements IModuleMinifier {
       id: 'Minifier',
       maxWorkers: maxThreads,
       workerData: terserOptions,
-      workerScriptPath: require.resolve('./MinifierWorker')
+      workerScriptPath: require.resolve('./MinifierWorker'),
+      workerResourceLimits
     });
 
     const { version: terserVersion } = require('terser/package.json');
@@ -152,31 +164,45 @@ export class WorkerPoolMinifier implements IModuleMinifier {
       });
   }
 
-  public async connect(): Promise<IMinifierConnection> {
+  /**
+   * {@inheritdoc IModuleMinifier.connectAsync}
+   */
+  public async connectAsync(): Promise<IMinifierConnection> {
     if (++this._refCount === 1) {
       this._pool.reset();
     }
 
+    const disconnectAsync: IMinifierConnection['disconnectAsync'] = async () => {
+      if (--this._refCount === 0) {
+        if (this._verbose) {
+          // eslint-disable-next-line no-console
+          console.log(`Shutting down minifier worker pool`);
+        }
+        await this._pool.finishAsync();
+        this._resultCache.clear();
+        this._activeRequests.clear();
+        if (this._verbose) {
+          // eslint-disable-next-line no-console
+          console.log(`Module minification: ${this._deduped} Deduped, ${this._minified} Processed`);
+        }
+      }
+      this._deduped = 0;
+      this._minified = 0;
+    };
+
     return {
       configHash: this._configHash,
 
-      disconnect: async () => {
-        if (--this._refCount === 0) {
-          if (this._verbose) {
-            // eslint-disable-next-line no-console
-            console.log(`Shutting down minifier worker pool`);
-          }
-          await this._pool.finishAsync();
-          this._resultCache.clear();
-          this._activeRequests.clear();
-          if (this._verbose) {
-            // eslint-disable-next-line no-console
-            console.log(`Module minification: ${this._deduped} Deduped, ${this._minified} Processed`);
-          }
-        }
-        this._deduped = 0;
-        this._minified = 0;
-      }
+      disconnectAsync,
+      disconnect: disconnectAsync
     };
+  }
+
+  /**
+   * @deprecated Use {@link WorkerPoolMinifier.connectAsync} instead
+   */
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  public async connect(): Promise<IMinifierConnection> {
+    return await this.connectAsync();
   }
 }

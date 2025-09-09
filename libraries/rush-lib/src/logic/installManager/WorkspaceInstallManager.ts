@@ -3,18 +3,21 @@
 
 import * as path from 'path';
 import * as semver from 'semver';
+import yaml from 'js-yaml';
 import {
   FileSystem,
   FileConstants,
   AlreadyReportedError,
   Async,
   type IDependenciesMetaTable,
-  Path
+  Path,
+  Sort
 } from '@rushstack/node-core-library';
+import { createHash } from 'crypto';
 
 import { BaseInstallManager } from '../base/BaseInstallManager';
 import type { IInstallManagerOptions } from '../base/BaseInstallManagerTypes';
-import type { BaseShrinkwrapFile } from '../../logic/base/BaseShrinkwrapFile';
+import type { BaseShrinkwrapFile } from '../base/BaseShrinkwrapFile';
 import { DependencySpecifier, DependencySpecifierType } from '../DependencySpecifier';
 import {
   type PackageJsonEditor,
@@ -23,21 +26,27 @@ import {
 } from '../../api/PackageJsonEditor';
 import { PnpmWorkspaceFile } from '../pnpm/PnpmWorkspaceFile';
 import type { RushConfigurationProject } from '../../api/RushConfigurationProject';
-import { RushConstants } from '../../logic/RushConstants';
+import { RushConstants } from '../RushConstants';
 import { Utilities } from '../../utilities/Utilities';
 import { InstallHelpers } from './InstallHelpers';
 import type { CommonVersionsConfiguration } from '../../api/CommonVersionsConfiguration';
 import type { RepoStateFile } from '../RepoStateFile';
-import { LastLinkFlagFactory } from '../../api/LastLinkFlag';
 import { EnvironmentConfiguration } from '../../api/EnvironmentConfiguration';
 import { ShrinkwrapFileFactory } from '../ShrinkwrapFileFactory';
 import { BaseProjectShrinkwrapFile } from '../base/BaseProjectShrinkwrapFile';
 import { type CustomTipId, type ICustomTipInfo, PNPM_CUSTOM_TIPS } from '../../api/CustomTipsConfiguration';
-import { PnpmShrinkwrapFile } from '../pnpm/PnpmShrinkwrapFile';
+import type { PnpmShrinkwrapFile } from '../pnpm/PnpmShrinkwrapFile';
 import { objectsAreDeepEqual } from '../../utilities/objectUtilities';
-import { type ILockfile, pnpmSyncPrepareAsync } from 'pnpm-sync-lib';
 import type { Subspace } from '../../api/Subspace';
 import { Colorize, ConsoleTerminalProvider } from '@rushstack/terminal';
+import { BaseLinkManager, SymlinkKind } from '../base/BaseLinkManager';
+import { FlagFile } from '../../api/FlagFile';
+import { Stopwatch } from '../../utilities/Stopwatch';
+import type { PnpmOptionsConfiguration } from '../pnpm/PnpmOptionsConfiguration';
+
+export interface IPnpmModules {
+  hoistedDependencies: { [dep in string]: { [depPath in string]: string } };
+}
 
 /**
  * This class implements common logic between "rush install" and "rush update".
@@ -82,8 +91,10 @@ export class WorkspaceInstallManager extends BaseInstallManager {
       );
     }
 
+    const { fullUpgrade, allowShrinkwrapUpdates, variant } = this.options;
+
     // eslint-disable-next-line no-console
-    console.log('\n' + Colorize.bold('Updating workspace files in ' + subspace.getSubspaceTempFolder()));
+    console.log('\n' + Colorize.bold('Updating workspace files in ' + subspace.getSubspaceTempFolderPath()));
 
     const shrinkwrapWarnings: string[] = [];
 
@@ -94,7 +105,7 @@ export class WorkspaceInstallManager extends BaseInstallManager {
     if (!shrinkwrapFile) {
       shrinkwrapIsUpToDate = false;
     } else {
-      if (!shrinkwrapFile.isWorkspaceCompatible && !this.options.fullUpgrade) {
+      if (!shrinkwrapFile.isWorkspaceCompatible && !fullUpgrade) {
         // eslint-disable-next-line no-console
         console.log();
         // eslint-disable-next-line no-console
@@ -133,26 +144,57 @@ export class WorkspaceInstallManager extends BaseInstallManager {
       );
       shrinkwrapIsUpToDate = false;
     } else {
-      const commonVersions: CommonVersionsConfiguration = subspace.getCommonVersions();
+      const commonVersions: CommonVersionsConfiguration = subspace.getCommonVersions(variant);
       if (repoState.preferredVersionsHash !== commonVersions.getPreferredVersionsHash()) {
         shrinkwrapWarnings.push(
           `Preferred versions from ${RushConstants.commonVersionsFilename} have been modified.`
         );
         shrinkwrapIsUpToDate = false;
       }
+
+      const stopwatch: Stopwatch = Stopwatch.start();
+
+      const packageJsonInjectedDependenciesHash: string | undefined =
+        subspace.getPackageJsonInjectedDependenciesHash(variant);
+
+      stopwatch.stop();
+
+      this._terminal.writeDebugLine(
+        `Total amount of time spent to hash related package.json files in the injected installation case: ${stopwatch.toString()}`
+      );
+
+      if (packageJsonInjectedDependenciesHash) {
+        // if packageJsonInjectedDependenciesHash exists
+        // make sure it matches the value in repoState
+        if (packageJsonInjectedDependenciesHash !== repoState.packageJsonInjectedDependenciesHash) {
+          shrinkwrapWarnings.push(`Some injected dependencies' package.json might have been modified.`);
+          shrinkwrapIsUpToDate = false;
+        }
+      } else {
+        // if packageJsonInjectedDependenciesHash not exists
+        // there is a situation that the subspace previously has injected dependencies but removed
+        // so we can check if the repoState up to date
+        if (repoState.packageJsonInjectedDependenciesHash !== undefined) {
+          shrinkwrapWarnings.push(
+            `It was detected that ${repoState.filePath} contains packageJsonInjectedDependenciesHash` +
+              ' but the injected dependencies feature is not enabled. You can manually remove this field in repo-state.json.' +
+              ' Or run rush update command to update the repo-state.json file.'
+          );
+        }
+      }
     }
 
     // To generate the workspace file, we will add each project to the file as we loop through and validate
     const workspaceFile: PnpmWorkspaceFile = new PnpmWorkspaceFile(
-      path.join(subspace.getSubspaceTempFolder(), 'pnpm-workspace.yaml')
+      path.join(subspace.getSubspaceTempFolderPath(), 'pnpm-workspace.yaml')
     );
 
-    // For pnpm pacakge manager, we need to handle dependenciesMeta changes in package.json. See more: https://pnpm.io/package_json#dependenciesmeta
+    // For pnpm package manager, we need to handle dependenciesMeta changes in package.json. See more: https://pnpm.io/package_json#dependenciesmeta
     // If dependenciesMeta settings is different between package.json and pnpm-lock.yaml, then shrinkwrapIsUpToDate return false.
-    // Build a object for dependenciesMeta settings in projects' package.jsons
+    // Build a object for dependenciesMeta settings in projects' package.json
     // key is the package path, value is the dependenciesMeta info for that package
     const expectedDependenciesMetaByProjectRelativePath: Record<string, IDependenciesMetaTable> = {};
-    const commonTempFolder: string = this.rushConfiguration.commonTempFolder;
+    const commonTempFolder: string = subspace.getSubspaceTempFolderPath();
     const rushJsonFolder: string = this.rushConfiguration.rushJsonFolder;
     // get the relative path from common temp folder to repo root folder
     const relativeFromTempFolderToRootFolder: string = path.relative(commonTempFolder, rushJsonFolder);
@@ -181,8 +223,18 @@ export class WorkspaceInstallManager extends BaseInstallManager {
         const dependencySpecifier: DependencySpecifier = new DependencySpecifier(name, version);
 
         // Is there a locally built Rush project that could satisfy this dependency?
-        const referencedLocalProject: RushConfigurationProject | undefined =
+        let referencedLocalProject: RushConfigurationProject | undefined =
           this.rushConfiguration.getProjectByName(name);
+
+        // If we enable exemptDecoupledDependenciesBetweenSubspaces, it will only check dependencies within the subspace.
+        if (
+          this.rushConfiguration.experimentsConfiguration.configuration
+            .exemptDecoupledDependenciesBetweenSubspaces
+        ) {
+          if (referencedLocalProject && !subspace.contains(referencedLocalProject)) {
+            referencedLocalProject = undefined;
+          }
+        }
 
         // Validate that local projects are referenced with workspace notation. If not, and it is not a
         // cyclic dependency, then it needs to be updated to specify `workspace:*` explicitly. Currently only
@@ -206,28 +258,31 @@ export class WorkspaceInstallManager extends BaseInstallManager {
             // eslint-disable-next-line no-console
             console.log(
               Colorize.red(
-                `"${rushProject.packageName}" depends on package "${name}" (${version}) which exists ` +
-                  'within the workspace but cannot be fulfilled with the specified version range. Either ' +
-                  'specify a valid version range, or add the package as a cyclic dependency.'
+                `"${rushProject.packageName}" depends on package "${name}" (${version}) which belongs to ` +
+                  'the workspace but cannot be fulfilled with the specified version range. Either ' +
+                  'specify a valid version range, or add the package to "decoupledLocalDependencies" in rush.json.'
               )
             );
             throw new AlreadyReportedError();
           }
 
-          if (!this.options.allowShrinkwrapUpdates) {
+          if (!allowShrinkwrapUpdates) {
             // eslint-disable-next-line no-console
             console.log();
             // eslint-disable-next-line no-console
             console.log(
               Colorize.red(
                 `"${rushProject.packageName}" depends on package "${name}" (${version}) which exists within ` +
-                  'the workspace. Run "rush update" to update workspace references for this package.'
+                  'the workspace. Run "rush update" to update workspace references for this package. ' +
+                  `If package "${name}" is intentionally expected to be installed from an external package feed, ` +
+                  `list package "${name}" in the "decoupledLocalDependencies" field in the ` +
+                  `"${rushProject.packageName}" entry in rush.json to suppress this error.`
               )
             );
             throw new AlreadyReportedError();
           }
 
-          if (this.options.fullUpgrade) {
+          if (fullUpgrade) {
             // We will update to `workspace` notation. If the version specified is a range, then use the provided range.
             // Otherwise, use `workspace:*` to ensure we're always using the workspace package.
             const workspaceRange: string =
@@ -239,7 +294,20 @@ export class WorkspaceInstallManager extends BaseInstallManager {
             shrinkwrapIsUpToDate = false;
             continue;
           }
-        } else if (dependencySpecifier.specifierType === DependencySpecifierType.Workspace) {
+        } else if (
+          dependencySpecifier.specifierType === DependencySpecifierType.Workspace &&
+          rushProject.decoupledLocalDependencies.has(name)
+        ) {
+          // If the dependency is a local project that is decoupled, then we need to ensure that it is not specified
+          // as a workspace project. If it is, then we need to update the package.json to remove the workspace notation.
+          this._terminal.writeWarningLine(
+            `"${rushProject.packageName}" depends on package ${name}@${version}, but also lists it in ` +
+              `its "decoupledLocalDependencies" array. Either update the host project's package.json to use ` +
+              `a version from an external feed instead of "workspace:" notation, or remove the dependency from the ` +
+              `host project's "decoupledLocalDependencies" array in rush.json.`
+          );
+          throw new AlreadyReportedError();
+        } else if (!rushProject.decoupledLocalDependencies.has(name)) {
           // Already specified as a local project. Allow the package manager to validate this
           continue;
         }
@@ -257,7 +325,7 @@ export class WorkspaceInstallManager extends BaseInstallManager {
       }
 
       // Now validate that the shrinkwrap file matches what is in the package.json
-      if (await shrinkwrapFile?.isWorkspaceProjectModifiedAsync(rushProject, subspace)) {
+      if (await shrinkwrapFile?.isWorkspaceProjectModifiedAsync(rushProject, subspace, variant)) {
         shrinkwrapWarnings.push(
           `Dependencies of project "${rushProject.packageName}" do not match the current shrinkwrap.`
         );
@@ -287,8 +355,16 @@ export class WorkspaceInstallManager extends BaseInstallManager {
     const lockfileDependenciesMetaByProjectRelativePath: { [key: string]: IDependenciesMetaTable } = {};
     if (shrinkwrapFile?.importers !== undefined) {
       for (const [key, value] of shrinkwrapFile?.importers) {
+        const projectRelativePath: string = Path.convertToSlashes(key);
+
+        // we only need to verify packages that exist in package.json and pnpm-lock.yaml
+        // PNPM won't actively remove deleted packages in importers, unless it has to
+        // so it is possible that a deleted package still showing in pnpm-lock.yaml
+        if (expectedDependenciesMetaByProjectRelativePath[projectRelativePath] === undefined) {
+          continue;
+        }
         if (value.dependenciesMeta !== undefined) {
-          lockfileDependenciesMetaByProjectRelativePath[Path.convertToSlashes(key)] = value.dependenciesMeta;
+          lockfileDependenciesMetaByProjectRelativePath[projectRelativePath] = value.dependenciesMeta;
         }
       }
     }
@@ -298,6 +374,7 @@ export class WorkspaceInstallManager extends BaseInstallManager {
       expectedDependenciesMetaByProjectRelativePath,
       lockfileDependenciesMetaByProjectRelativePath
     );
+
     if (!dependenciesMetaAreEqual) {
       shrinkwrapWarnings.push(
         "The dependenciesMeta settings in one or more package.json don't match the current shrinkwrap."
@@ -305,8 +382,34 @@ export class WorkspaceInstallManager extends BaseInstallManager {
       shrinkwrapIsUpToDate = false;
     }
 
+    // Check if overrides and globalOverrides are the same
+    const pnpmOptions: PnpmOptionsConfiguration =
+      subspace.getPnpmOptions() || this.rushConfiguration.pnpmOptions;
+
+    const overridesAreEqual: boolean = objectsAreDeepEqual<Record<string, string>>(
+      pnpmOptions.globalOverrides ?? {},
+      shrinkwrapFile?.overrides ? Object.fromEntries(shrinkwrapFile?.overrides) : {}
+    );
+
+    if (!overridesAreEqual) {
+      shrinkwrapWarnings.push("The overrides settings doesn't match the current shrinkwrap.");
+      shrinkwrapIsUpToDate = false;
+    }
+
+    // Check if packageExtensionsChecksum matches globalPackageExtension's hash
+    const packageExtensionsChecksum: string | undefined = this._getPackageExtensionChecksum(
+      pnpmOptions.globalPackageExtensions
+    );
+    const packageExtensionsChecksumAreEqual: boolean =
+      packageExtensionsChecksum === shrinkwrapFile?.packageExtensionsChecksum;
+
+    if (!packageExtensionsChecksumAreEqual) {
+      shrinkwrapWarnings.push("The package extension hash doesn't match the current shrinkwrap.");
+      shrinkwrapIsUpToDate = false;
+    }
+
     // Write the common package.json
-    InstallHelpers.generateCommonPackageJson(this.rushConfiguration, subspace, undefined);
+    InstallHelpers.generateCommonPackageJson(this.rushConfiguration, subspace, undefined, this._terminal);
 
     // Save the generated workspace file. Don't update the file timestamp unless the content has changed,
     // since "rush install" will consider this timestamp
@@ -315,17 +418,33 @@ export class WorkspaceInstallManager extends BaseInstallManager {
     return { shrinkwrapIsUpToDate, shrinkwrapWarnings };
   }
 
-  protected canSkipInstall(lastModifiedDate: Date, subspace: Subspace): boolean {
-    if (!super.canSkipInstall(lastModifiedDate, subspace)) {
+  private _getPackageExtensionChecksum(
+    packageExtensions: Record<string, unknown> | undefined
+  ): string | undefined {
+    // https://github.com/pnpm/pnpm/blob/ba9409ffcef0c36dc1b167d770a023c87444822d/pkg-manager/core/src/install/index.ts#L331
+    const packageExtensionsChecksum: string | undefined =
+      Object.keys(packageExtensions ?? {}).length === 0
+        ? undefined
+        : createObjectChecksum(packageExtensions!);
+
+    return packageExtensionsChecksum;
+  }
+
+  protected async canSkipInstallAsync(
+    lastModifiedDate: Date,
+    subspace: Subspace,
+    variant: string | undefined
+  ): Promise<boolean> {
+    if (!(await super.canSkipInstallAsync(lastModifiedDate, subspace, variant))) {
       return false;
     }
 
     const potentiallyChangedFiles: string[] = [];
 
-    if (this.rushConfiguration.packageManager === 'pnpm') {
+    if (this.rushConfiguration.isPnpm) {
       // Add workspace file. This file is only modified when workspace packages change.
       const pnpmWorkspaceFilename: string = path.join(
-        subspace.getSubspaceTempFolder(),
+        subspace.getSubspaceTempFolderPath(),
         'pnpm-workspace.yaml'
       );
 
@@ -338,17 +457,17 @@ export class WorkspaceInstallManager extends BaseInstallManager {
     // files
     // Example: [ "C:\MyRepo\projects\projectA\node_modules", "C:\MyRepo\projects\projectA\package.json" ]
     potentiallyChangedFiles.push(
-      ...this.rushConfiguration.projects.map((project) => {
+      ...subspace.getProjects().map((project) => {
         return path.join(project.projectFolder, RushConstants.nodeModulesFolderName);
       }),
-      ...this.rushConfiguration.projects.map((project) => {
+      ...subspace.getProjects().map((project) => {
         return path.join(project.projectFolder, FileConstants.PackageJson);
       })
     );
 
     // NOTE: If any of the potentiallyChangedFiles does not exist, then isFileTimestampCurrent()
     // returns false.
-    return Utilities.isFileTimestampCurrent(lastModifiedDate, potentiallyChangedFiles);
+    return Utilities.isFileTimestampCurrentAsync(lastModifiedDate, potentiallyChangedFiles);
   }
 
   /**
@@ -367,7 +486,7 @@ export class WorkspaceInstallManager extends BaseInstallManager {
     }
 
     const commonNodeModulesFolder: string = path.join(
-      subspace.getSubspaceTempFolder(),
+      subspace.getSubspaceTempFolderPath(),
       RushConstants.nodeModulesFolderName
     );
 
@@ -399,7 +518,7 @@ export class WorkspaceInstallManager extends BaseInstallManager {
         '\n' +
           Colorize.bold(
             `Running "${this.rushConfiguration.packageManager} install" in` +
-              ` ${subspace.getSubspaceTempFolder()}`
+              ` ${subspace.getSubspaceTempFolderPath()}`
           ) +
           '\n'
       );
@@ -448,18 +567,18 @@ export class WorkspaceInstallManager extends BaseInstallManager {
             }
           : undefined;
       try {
-        await Utilities.executeCommandAndProcessOutputWithRetryAsync(
+        await Utilities.executeCommandWithRetryAsync(
           {
             command: packageManagerFilename,
             args: installArgs,
-            workingDirectory: subspace.getSubspaceTempFolder(),
+            workingDirectory: subspace.getSubspaceTempFolderPath(),
             environment: packageManagerEnv,
-            suppressOutput: false
+            suppressOutput: false,
+            onStdoutStreamChunk: onPnpmStdoutChunk
           },
           this.options.maxInstallAttempts,
-          onPnpmStdoutChunk,
           () => {
-            if (this.rushConfiguration.packageManager === 'pnpm') {
+            if (this.rushConfiguration.isPnpm) {
               this._terminal.writeWarningLine(`Deleting the "node_modules" folder`);
               this.installRecycler.moveFolder(commonNodeModulesFolder);
 
@@ -502,38 +621,12 @@ export class WorkspaceInstallManager extends BaseInstallManager {
       await doInstallInternalAsync(this.options);
     }
 
-    // if usePnpmSyncForInjectedDependencies is true
-    // the pnpm-sync will generate the pnpm-sync.json based on lockfile
-    if (this.rushConfiguration.packageManager === 'pnpm' && experiments?.usePnpmSyncForInjectedDependencies) {
-      const pnpmLockfilePath: string = subspace.getTempShrinkwrapFilename();
-      const pnpmStorePath: string = `${this.rushConfiguration.commonTempFolder}/node_modules/.pnpm`;
-      await pnpmSyncPrepareAsync({
-        lockfilePath: pnpmLockfilePath,
-        storePath: pnpmStorePath,
-        readPnpmLockfile: async (lockfilePath: string) => {
-          const wantedPnpmLockfile: PnpmShrinkwrapFile | undefined = await PnpmShrinkwrapFile.loadFromFile(
-            lockfilePath,
-            { withCaching: true }
-          );
-
-          if (!wantedPnpmLockfile) {
-            return undefined;
-          } else {
-            const result: ILockfile = {
-              importers: Object.fromEntries(wantedPnpmLockfile.importers.entries())
-            };
-            return result;
-          }
-        }
-      });
-    }
-
     // If all attempts fail we just terminate. No special handling needed.
 
     // Ensure that node_modules folders exist after install, since the timestamps on these folders are used
     // to determine if the install can be skipped
     const projectNodeModulesFolders: string[] = [
-      path.join(subspace.getSubspaceTempFolder(), RushConstants.nodeModulesFolderName),
+      path.join(subspace.getSubspaceTempFolderPath(), RushConstants.nodeModulesFolderName),
       ...this.rushConfiguration.projects.map((project) => {
         return path.join(project.projectFolder, RushConstants.nodeModulesFolderName);
       })
@@ -554,7 +647,6 @@ export class WorkspaceInstallManager extends BaseInstallManager {
     // projects with dependencies, a lockfile won't be generated.
     const tempShrinkwrapFile: BaseShrinkwrapFile | undefined = ShrinkwrapFileFactory.getShrinkwrapFile(
       this.rushConfiguration.packageManager,
-      this.rushConfiguration.pnpmOptions,
       subspace.getTempShrinkwrapFilename()
     );
 
@@ -567,10 +659,7 @@ export class WorkspaceInstallManager extends BaseInstallManager {
         },
         { concurrency: 10 }
       );
-    } else if (
-      this.rushConfiguration.packageManager === 'pnpm' &&
-      this.rushConfiguration.pnpmOptions?.useWorkspaces
-    ) {
+    } else if (this.rushConfiguration.isPnpm && this.rushConfiguration.pnpmOptions?.useWorkspaces) {
       // If we're in PNPM workspace mode and PNPM didn't create a shrinkwrap file,
       // there are no dependencies. Generate empty shrinkwrap files for all projects.
       await Async.forEachAsync(
@@ -588,8 +677,75 @@ export class WorkspaceInstallManager extends BaseInstallManager {
       );
     }
 
+    // If the splitWorkspaceCompatibility is enabled for subspaces, create symlinks to mimic the behaviour
+    // of having the node_modules folder created directly in the project folder. This requires symlinking two categories:
+    // 1) Symlink any packages that are declared to be publicly hoisted, such as by using public-hoist-pattern in .npmrc.
+    //    This creates a symlink from <project_folder>/node_modules/<dependency> -> temp/<subspace_name>/node_modules/<dependency>
+    // 2) Symlink any workspace packages that are declared in the temp folder, as some packages may expect these packages to exist
+    //    in the node_modules folder.
+    //    This creates a symlink from temp/<subspace_name>/node_modules/<workspace_dependency_name> -> <workspace_dependency_folder>
+    if (
+      this.rushConfiguration.subspacesFeatureEnabled &&
+      this.rushConfiguration.subspacesConfiguration?.splitWorkspaceCompatibility
+    ) {
+      const tempNodeModulesPath: string = `${subspace.getSubspaceTempFolderPath()}/node_modules`;
+      const modulesFilePath: string = `${tempNodeModulesPath}/${RushConstants.pnpmModulesFilename}`;
+      if (
+        subspace.subspaceName.startsWith('split_') &&
+        subspace.getProjects().length === 1 &&
+        (await FileSystem.existsAsync(modulesFilePath))
+      ) {
+        // Find the .modules.yaml file in the subspace temp/node_modules folder
+        const modulesContent: string = await FileSystem.readFileAsync(modulesFilePath);
+        const yamlContent: IPnpmModules = yaml.load(modulesContent, { filename: modulesFilePath });
+        const { hoistedDependencies } = yamlContent;
+        const subspaceProject: RushConfigurationProject = subspace.getProjects()[0];
+        const projectNodeModulesPath: string = `${subspaceProject.projectFolder}/node_modules`;
+        for (const value of Object.values(hoistedDependencies)) {
+          for (const [filePath, type] of Object.entries(value)) {
+            if (type === 'public') {
+              if (Utilities.existsOrIsSymlink(`${projectNodeModulesPath}/${filePath}`)) {
+                await FileSystem.deleteFolderAsync(`${projectNodeModulesPath}/${filePath}`);
+              }
+              // If we don't already have a symlink for this package, create one
+              const parentDir: string = Utilities.trimAfterLastSlash(`${projectNodeModulesPath}/${filePath}`);
+              await FileSystem.ensureFolderAsync(parentDir);
+              await BaseLinkManager._createSymlinkAsync({
+                linkTargetPath: `${tempNodeModulesPath}/${filePath}`,
+                newLinkPath: `${projectNodeModulesPath}/${filePath}`,
+                symlinkKind: SymlinkKind.Directory
+              });
+            }
+          }
+        }
+      }
+
+      // Look for any workspace linked packages anywhere in this subspace, symlink them from the temp node_modules folder.
+      const subspaceDependencyProjects: Set<RushConfigurationProject> = new Set();
+      for (const subspaceProject of subspace.getProjects()) {
+        for (const dependencyProject of subspaceProject.dependencyProjects) {
+          subspaceDependencyProjects.add(dependencyProject);
+        }
+      }
+      for (const dependencyProject of subspaceDependencyProjects) {
+        const symlinkToCreate: string = `${tempNodeModulesPath}/${dependencyProject.packageName}`;
+        if (!Utilities.existsOrIsSymlink(symlinkToCreate)) {
+          const parentFolder: string = Utilities.trimAfterLastSlash(symlinkToCreate);
+          await FileSystem.ensureFolderAsync(parentFolder);
+          await BaseLinkManager._createSymlinkAsync({
+            linkTargetPath: dependencyProject.projectFolder,
+            newLinkPath: symlinkToCreate,
+            symlinkKind: SymlinkKind.Directory
+          });
+        }
+      }
+    }
     // TODO: Remove when "rush link" and "rush unlink" are deprecated
-    LastLinkFlagFactory.getCommonTempFlag(subspace).create();
+    await new FlagFile(
+      subspace.getSubspaceTempFolderPath(),
+      RushConstants.lastLinkFlagFilename,
+      {}
+    ).createAsync();
   }
 
   /**
@@ -600,7 +756,7 @@ export class WorkspaceInstallManager extends BaseInstallManager {
     super.pushConfigurationArgs(args, options, subspace);
 
     // Add workspace-specific args
-    if (this.rushConfiguration.packageManager === 'pnpm') {
+    if (this.rushConfiguration.isPnpm) {
       args.push('--recursive');
       args.push('--link-workspace-packages', 'false');
 
@@ -624,9 +780,19 @@ export class WorkspaceInstallManager extends BaseInstallManager {
         }
       }
 
-      for (const arg of this.options.pnpmFilterArguments) {
-        args.push(arg);
+      for (const arg of this.options.pnpmFilterArgumentValues) {
+        args.push('--filter', arg);
       }
     }
   }
+}
+
+/**
+ * Source: https://github.com/pnpm/pnpm/blob/ba9409ffcef0c36dc1b167d770a023c87444822d/pkg-manager/core/src/install/index.ts#L821-L824
+ * @param obj
+ * @returns
+ */
+function createObjectChecksum(obj: Record<string, unknown>): string {
+  const s: string = JSON.stringify(Sort.sortKeys(obj));
+  return createHash('md5').update(s).digest('hex');
 }

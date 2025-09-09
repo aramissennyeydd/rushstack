@@ -2,16 +2,24 @@
 // See LICENSE in the project root for license information.
 
 import { Async, FileSystem } from '@rushstack/node-core-library';
-import { pnpmSyncCopyAsync } from 'pnpm-sync-lib';
+import type { ITerminal } from '@rushstack/terminal';
+import { type ILogMessageCallbackOptions, pnpmSyncCopyAsync } from 'pnpm-sync-lib';
 
 import { OperationStatus } from './OperationStatus';
 import type { IOperationRunnerContext } from './IOperationRunner';
 import type { IPhasedCommandPlugin, PhasedCommandHooks } from '../../pluginFramework/PhasedCommandHooks';
 import type { OperationExecutionRecord } from './OperationExecutionRecord';
+import { PnpmSyncUtilities } from '../../utilities/PnpmSyncUtilities';
+import { RushConstants } from '../RushConstants';
 
 const PLUGIN_NAME: 'PnpmSyncCopyOperationPlugin' = 'PnpmSyncCopyOperationPlugin';
 
 export class PnpmSyncCopyOperationPlugin implements IPhasedCommandPlugin {
+  private readonly _terminal: ITerminal;
+
+  public constructor(terminal: ITerminal) {
+    this._terminal = terminal;
+  }
   public apply(hooks: PhasedCommandHooks): void {
     hooks.afterExecuteOperation.tapPromise(
       PLUGIN_NAME,
@@ -22,29 +30,29 @@ export class PnpmSyncCopyOperationPlugin implements IPhasedCommandPlugin {
           operation: { associatedProject: project }
         } = record;
 
-        //skip if the phase is skipped, from cache or no operation
+        //skip if the phase is skipped or no operation
         if (
           status === OperationStatus.Skipped ||
-          status === OperationStatus.FromCache ||
-          status === OperationStatus.NoOp
+          status === OperationStatus.NoOp ||
+          status === OperationStatus.Failure
         ) {
           return;
         }
 
-        if (project) {
-          const pnpmSyncJsonPath: string = `${project.projectFolder}/node_modules/.pnpm-sync.json`;
-          if (await FileSystem.exists(pnpmSyncJsonPath)) {
-            const { PackageExtractor } = await import(
-              /* webpackChunkName: 'PackageExtractor' */
-              '@rushstack/package-extractor'
-            );
-            await pnpmSyncCopyAsync({
-              pnpmSyncJsonPath,
-              ensureFolder: FileSystem.ensureFolderAsync,
-              forEachAsyncWithConcurrency: Async.forEachAsync,
-              getPackageIncludedFiles: PackageExtractor.getPackageIncludedFilesAsync
-            });
-          }
+        const pnpmSyncJsonPath: string = `${project.projectFolder}/${RushConstants.nodeModulesFolderName}/${RushConstants.pnpmSyncFilename}`;
+        if (await FileSystem.exists(pnpmSyncJsonPath)) {
+          const { PackageExtractor } = await import(
+            /* webpackChunkName: 'PackageExtractor' */
+            '@rushstack/package-extractor'
+          );
+          await pnpmSyncCopyAsync({
+            pnpmSyncJsonPath,
+            ensureFolderAsync: FileSystem.ensureFolderAsync,
+            forEachAsyncWithConcurrency: Async.forEachAsync,
+            getPackageIncludedFiles: PackageExtractor.getPackageIncludedFilesAsync,
+            logMessageCallback: (logMessageOptions: ILogMessageCallbackOptions) =>
+              PnpmSyncUtilities.processLogMessage(logMessageOptions, this._terminal)
+          });
         }
       }
     );

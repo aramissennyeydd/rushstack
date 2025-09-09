@@ -6,6 +6,7 @@ import type { CommonVersionsConfiguration } from '../api/CommonVersionsConfigura
 import { DependencyType, type PackageJsonDependency } from '../api/PackageJsonEditor';
 import type { RushConfiguration } from '../api/RushConfiguration';
 import type { RushConfigurationProject } from '../api/RushConfigurationProject';
+import type { Subspace } from '../api/Subspace';
 
 export interface IDependencyAnalysis {
   /**
@@ -32,7 +33,7 @@ export class DependencyAnalyzer {
     | undefined;
 
   private _rushConfiguration: RushConfiguration;
-  private _analysis: IDependencyAnalysis | undefined;
+  private _analysisByVariantBySubspace: Map<string, WeakMap<Subspace, IDependencyAnalysis>> | undefined;
 
   private constructor(rushConfiguration: RushConfiguration) {
     this._rushConfiguration = rushConfiguration;
@@ -53,12 +54,36 @@ export class DependencyAnalyzer {
     return analyzer;
   }
 
-  public getAnalysis(): IDependencyAnalysis {
-    if (!this._analysis) {
-      this._analysis = this._getAnalysisInternal();
+  public getAnalysis(
+    subspace: Subspace | undefined,
+    variant: string | undefined,
+    addAction: boolean
+  ): IDependencyAnalysis {
+    // Use an empty string as the key when no variant provided. Anything else would possibly conflict
+    // with a variant created by the user
+    const variantKey: string = variant || '';
+
+    if (!this._analysisByVariantBySubspace) {
+      this._analysisByVariantBySubspace = new Map();
     }
 
-    return this._analysis;
+    const subspaceToAnalyze: Subspace = subspace || this._rushConfiguration.defaultSubspace;
+    let analysisForVariant: WeakMap<Subspace, IDependencyAnalysis> | undefined =
+      this._analysisByVariantBySubspace.get(variantKey);
+
+    if (!analysisForVariant) {
+      analysisForVariant = new WeakMap();
+      this._analysisByVariantBySubspace.set(variantKey, analysisForVariant);
+    }
+
+    let analysisForSubspace: IDependencyAnalysis | undefined = analysisForVariant.get(subspaceToAnalyze);
+    if (!analysisForSubspace) {
+      analysisForSubspace = this._getAnalysisInternal(subspaceToAnalyze, variant, addAction);
+
+      analysisForVariant.set(subspaceToAnalyze, analysisForSubspace);
+    }
+
+    return analysisForSubspace;
   }
 
   /**
@@ -67,16 +92,24 @@ export class DependencyAnalyzer {
    * @remarks
    * The result of this function is not cached.
    */
-  private _getAnalysisInternal(): IDependencyAnalysis {
-    const commonVersionsConfiguration: CommonVersionsConfiguration =
-      this._rushConfiguration.getCommonVersions();
+  private _getAnalysisInternal(
+    subspace: Subspace,
+    variant: string | undefined,
+    addAction: boolean
+  ): IDependencyAnalysis {
+    const commonVersionsConfiguration: CommonVersionsConfiguration = subspace.getCommonVersions(variant);
     const allVersionsByPackageName: Map<string, Set<string>> = new Map();
     const allowedAlternativeVersions: Map<
       string,
       ReadonlyArray<string>
     > = commonVersionsConfiguration.allowedAlternativeVersions;
 
-    for (const project of this._rushConfiguration.projects) {
+    let projectsToProcess: RushConfigurationProject[] = this._rushConfiguration.projects;
+    if (addAction && this._rushConfiguration.subspacesFeatureEnabled) {
+      projectsToProcess = subspace.getProjects();
+    }
+
+    for (const project of projectsToProcess) {
       const dependencies: PackageJsonDependency[] = [
         ...project.packageJsonEditor.dependencyList,
         ...project.packageJsonEditor.devDependencyList

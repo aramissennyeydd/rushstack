@@ -2,13 +2,13 @@
 // See LICENSE in the project root for license information.
 
 import * as argparse from 'argparse';
-import { AnsiEscape } from '@rushstack/terminal';
 
 import { DynamicCommandLineParser } from '../providers/DynamicCommandLineParser';
 import { DynamicCommandLineAction } from '../providers/DynamicCommandLineAction';
 import { CommandLineParameterBase } from '../parameters/BaseClasses';
 import type { CommandLineParser } from '../providers/CommandLineParser';
 import type { CommandLineAction } from '../providers/CommandLineAction';
+import { ensureHelpTextMatchesSnapshot } from './helpTestUtilities';
 
 interface IExtendedArgumentParser extends argparse.ArgumentParser {
   _printMessage: (message: string) => void;
@@ -174,18 +174,9 @@ describe(CommandLineParameterBase.name, () => {
     process.env = existingEnv;
   });
 
-  it('prints the global help', () => {
+  it('renders help text', () => {
     const commandLineParser: CommandLineParser = createParser();
-    const helpText: string = AnsiEscape.removeCodes(commandLineParser.renderHelpText());
-    expect(helpText).toMatchSnapshot();
-  });
-
-  it('prints the action help', () => {
-    const commandLineParser: CommandLineParser = createParser();
-    const helpText: string = AnsiEscape.removeCodes(
-      commandLineParser.getAction('do:the-job').renderHelpText()
-    );
-    expect(helpText).toMatchSnapshot();
+    ensureHelpTextMatchesSnapshot(commandLineParser);
   });
 
   it('parses an input with ALL parameters', async () => {
@@ -220,7 +211,7 @@ describe(CommandLineParameterBase.name, () => {
       'second'
     ];
 
-    await expect(commandLineParser.execute(args)).resolves.toBe(true);
+    await expect(commandLineParser.executeAsync(args)).resolves.toBe(true);
 
     expect(commandLineParser.selectedAction).toBe(action);
 
@@ -263,7 +254,7 @@ describe(CommandLineParameterBase.name, () => {
     const action: CommandLineAction = commandLineParser.getAction('do:the-job');
     const args: string[] = ['do:the-job', '--integer-required', '123', '--env-integer-required', '321'];
 
-    await expect(commandLineParser.execute(args)).resolves.toBe(true);
+    await expect(commandLineParser.executeAsync(args)).resolves.toBe(true);
 
     expect(commandLineParser.selectedAction).toBe(action);
 
@@ -327,7 +318,7 @@ describe(CommandLineParameterBase.name, () => {
     process.env.ENV_STRING_LIST = 'simple text';
     process.env.ENV_JSON_STRING_LIST = ' [ 1, true, "Hello, world!" ] ';
 
-    await expect(commandLineParser.execute(args)).resolves.toBe(true);
+    await expect(commandLineParser.executeAsync(args)).resolves.toBe(true);
 
     expect(commandLineParser.selectedAction).toBe(action);
 
@@ -353,7 +344,7 @@ describe(CommandLineParameterBase.name, () => {
       '123'
     ];
 
-    await expect(commandLineParser.execute(args)).resolves.toBe(true);
+    await expect(commandLineParser.executeAsync(args)).resolves.toBe(true);
 
     expect(commandLineParser.selectedAction).toBe(action);
 
@@ -375,7 +366,7 @@ describe(CommandLineParameterBase.name, () => {
       });
 
     const args: string[] = ['do:the-job', '--integer-required', '1'];
-    await expect(commandLineParser.executeWithoutErrorHandling(args)).rejects.toMatchSnapshot('Error');
+    await expect(commandLineParser.executeWithoutErrorHandlingAsync(args)).rejects.toMatchSnapshot('Error');
     expect(printMessageSpy).toHaveBeenCalled();
     expect(printMessageSpy.mock.calls[0][0]).toMatchSnapshot('Usage');
   });
@@ -392,7 +383,7 @@ describe(CommandLineParameterBase.name, () => {
 
       async function runWithArgsAsync(args: string[]): Promise<void> {
         const commandLineParser: CommandLineParser = createParser();
-        await expect(commandLineParser.execute(args)).resolves.toBe(false);
+        await expect(commandLineParser.executeAsync(args)).resolves.toBe(false);
       }
 
       await runWithArgsAsync(['do:the-job', '--integer-required', '1']);
@@ -442,7 +433,7 @@ describe(CommandLineParameterBase.name, () => {
 
       let error: string | undefined;
       try {
-        await commandLineParser.executeWithoutErrorHandling(args);
+        await commandLineParser.executeWithoutErrorHandlingAsync(args);
       } catch (e) {
         error = e.message;
       }
@@ -458,7 +449,7 @@ describe(CommandLineParameterBase.name, () => {
       process.env.ENV_COLOR = '[{}]';
 
       await expect(
-        commandLineParser.executeWithoutErrorHandling(args)
+        commandLineParser.executeWithoutErrorHandlingAsync(args)
       ).rejects.toThrowErrorMatchingSnapshot();
     });
 
@@ -468,7 +459,7 @@ describe(CommandLineParameterBase.name, () => {
       process.env.ENV_COLOR = 'oblong';
 
       await expect(
-        commandLineParser.executeWithoutErrorHandling(args)
+        commandLineParser.executeWithoutErrorHandlingAsync(args)
       ).rejects.toThrowErrorMatchingSnapshot();
     });
   });

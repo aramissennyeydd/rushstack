@@ -99,6 +99,7 @@ function tryStartLocalHeft(): boolean {
       throw new Error('Error probing for local Heft version: ' + (error as Error).message);
     }
 
+    console.log(`Found local Heft version at ${heftEntryPoint}`);
     require(heftEntryPoint);
 
     // We found and successfully invoked the local Heft

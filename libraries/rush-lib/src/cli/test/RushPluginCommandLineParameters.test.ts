@@ -7,6 +7,7 @@ import path from 'path';
 import { FileSystem, LockFile } from '@rushstack/node-core-library';
 import { RushCommandLineParser } from '../RushCommandLineParser';
 import { Autoinstaller } from '../../logic/Autoinstaller';
+import { EnvironmentConfiguration } from '../../api/EnvironmentConfiguration';
 
 describe('PluginCommandLineParameters', () => {
   let originCWD: string | undefined;
@@ -46,7 +47,7 @@ describe('PluginCommandLineParameters', () => {
 
   beforeEach(() => {
     // ts-command-line calls process.exit() which interferes with Jest
-    jest.spyOn(process, 'exit').mockImplementation((code?: number) => {
+    jest.spyOn(process, 'exit').mockImplementation((code) => {
       throw new Error(`Test code called process.exit(${code})`);
     });
 
@@ -61,6 +62,8 @@ describe('PluginCommandLineParameters', () => {
       originCWD = undefined;
       process.argv = _argv;
     }
+
+    EnvironmentConfiguration.reset();
   });
 
   afterAll(() => {
@@ -73,7 +76,7 @@ describe('PluginCommandLineParameters', () => {
     mockProcessArgv(['fake-node', 'fake-rush', 'cmd-parameters-test', '--mystring', '123']);
     const parser = new RushCommandLineParser({ cwd: currentCWD });
 
-    await expect(parser.execute()).resolves.toEqual(true);
+    await expect(parser.executeAsync()).resolves.toEqual(true);
 
     const action = parser.actions.find((ac) => ac.actionName === 'cmd-parameters-test');
 
@@ -85,7 +88,7 @@ describe('PluginCommandLineParameters', () => {
     mockProcessArgv(['fake-node', 'fake-rush', 'cmd-parameters-test', '--myinteger', '1']);
     const parser = new RushCommandLineParser({ cwd: currentCWD });
 
-    await expect(parser.execute()).resolves.toEqual(true);
+    await expect(parser.executeAsync()).resolves.toEqual(true);
 
     const action = parser.actions.find((ac) => ac.actionName === 'cmd-parameters-test');
 
@@ -97,7 +100,7 @@ describe('PluginCommandLineParameters', () => {
     mockProcessArgv(['fake-node', 'fake-rush', 'cmd-parameters-test', '--myflag']);
     const parser = new RushCommandLineParser({ cwd: currentCWD });
 
-    await expect(parser.execute()).resolves.toEqual(true);
+    await expect(parser.executeAsync()).resolves.toEqual(true);
 
     const action = parser.actions.find((ac) => ac.actionName === 'cmd-parameters-test');
 
@@ -109,7 +112,7 @@ describe('PluginCommandLineParameters', () => {
     mockProcessArgv(['fake-node', 'fake-rush', 'cmd-parameters-test', '--mychoice', 'a']);
     const parser = new RushCommandLineParser({ cwd: currentCWD });
 
-    await expect(parser.execute()).resolves.toEqual(true);
+    await expect(parser.executeAsync()).resolves.toEqual(true);
 
     const action = parser.actions.find((ac) => ac.actionName === 'cmd-parameters-test');
 
@@ -129,7 +132,7 @@ describe('PluginCommandLineParameters', () => {
     ]);
     const parser = new RushCommandLineParser({ cwd: currentCWD });
 
-    await expect(parser.execute()).resolves.toEqual(true);
+    await expect(parser.executeAsync()).resolves.toEqual(true);
 
     const action = parser.actions.find((ac) => ac.actionName === 'cmd-parameters-test');
 
@@ -149,7 +152,7 @@ describe('PluginCommandLineParameters', () => {
     ]);
     const parser = new RushCommandLineParser({ cwd: currentCWD });
 
-    await expect(parser.execute()).resolves.toEqual(true);
+    await expect(parser.executeAsync()).resolves.toEqual(true);
 
     const action = parser.actions.find((ac) => ac.actionName === 'cmd-parameters-test');
     expect(action?.getIntegerListParameter('--myintegerlist').values).toStrictEqual([1, 2]);
@@ -168,7 +171,7 @@ describe('PluginCommandLineParameters', () => {
     ]);
     const parser = new RushCommandLineParser({ cwd: currentCWD });
 
-    await expect(parser.execute()).resolves.toEqual(true);
+    await expect(parser.executeAsync()).resolves.toEqual(true);
 
     const action = parser.actions.find((ac) => ac.actionName === 'cmd-parameters-test');
     expect(action?.getChoiceListParameter('--mychoicelist').values).toStrictEqual(['a', 'c']);

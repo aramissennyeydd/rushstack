@@ -9,22 +9,48 @@
  */
 
 export {
-  ConfigurationFile,
-  IConfigurationFileOptionsBase,
-  IConfigurationFileOptionsWithJsonSchemaFilePath,
-  IConfigurationFileOptionsWithJsonSchemaObject,
-  IConfigurationFileOptions,
-  ICustomJsonPathMetadata,
-  ICustomPropertyInheritance,
-  IJsonPathMetadataResolverOptions,
-  IJsonPathMetadata,
-  IJsonPathsMetadata,
+  ConfigurationFileBase,
+  type CustomValidationFunction,
+  type IConfigurationFileOptionsBase,
+  type IConfigurationFileOptionsWithJsonSchemaFilePath,
+  type IConfigurationFileOptionsWithJsonSchemaObject,
+  type IConfigurationFileOptions,
+  type ICustomJsonPathMetadata,
+  type ICustomPropertyInheritance,
+  type IJsonPathMetadataResolverOptions,
+  type IJsonPathMetadata,
+  type IJsonPathsMetadata,
   InheritanceType,
-  INonCustomJsonPathMetadata,
-  IOriginalValueOptions,
-  IPropertiesInheritance,
-  IPropertyInheritance,
-  IPropertyInheritanceDefaults,
+  type INonCustomJsonPathMetadata,
+  type IOnConfigurationFileNotFoundCallback,
+  type IOriginalValueOptions,
+  type IPropertiesInheritance,
+  type IPropertyInheritance,
+  type IPropertyInheritanceDefaults,
   PathResolutionMethod,
-  PropertyInheritanceCustomFunction
-} from './ConfigurationFile';
+  type PropertyInheritanceCustomFunction
+} from './ConfigurationFileBase';
+
+import { ProjectConfigurationFile } from './ProjectConfigurationFile';
+
+/**
+ * @deprecated Use {@link ProjectConfigurationFile} instead.
+ * @beta
+ */
+export const ConfigurationFile: typeof ProjectConfigurationFile = ProjectConfigurationFile;
+
+/**
+ * @deprecated Use {@link ProjectConfigurationFile} instead.
+ * @beta
+ */
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export type ConfigurationFile<TConfigurationFile> = ProjectConfigurationFile<TConfigurationFile>;
+
+export {
+  ProjectConfigurationFile,
+  type IProjectConfigurationFileOptions,
+  type IProjectConfigurationFileSpecification
+} from './ProjectConfigurationFile';
+export { NonProjectConfigurationFile } from './NonProjectConfigurationFile';
+
+export * as TestUtilities from './TestUtilities';

@@ -2,13 +2,12 @@
 // See LICENSE in the project root for license information.
 
 import type * as ts from 'typescript';
-import * as path from 'path';
 
-import type { ParserServices, TSESLint, TSESTree } from '@typescript-eslint/utils';
+import type { TSESLint, TSESTree } from '@typescript-eslint/utils';
 import { ESLintUtils } from '@typescript-eslint/utils';
 
 import { PackletAnalyzer } from './PackletAnalyzer';
-import { DependencyAnalyzer, IPackletImport } from './DependencyAnalyzer';
+import { DependencyAnalyzer, type IPackletImport } from './DependencyAnalyzer';
 import { Path } from './Path';
 
 export type MessageIds = 'circular-import';
@@ -38,7 +37,7 @@ const circularDeps: TSESLint.RuleModule<MessageIds, Options> = {
 
     // Example: /path/to/my-project/tsconfig.json
     const program: ts.Program = ESLintUtils.getParserServices(context).program;
-    const tsconfigFilePath: string | undefined = program.getCompilerOptions()['configFilePath'] as string;
+    const tsconfigFilePath: string | undefined = program.getCompilerOptions().configFilePath as string;
 
     const packletAnalyzer: PackletAnalyzer = PackletAnalyzer.analyzeInputFile(
       inputFilePath,

@@ -2,8 +2,13 @@
 // See LICENSE in the project root for license information.
 
 import fs from 'fs';
-import path from 'path';
 
 export function isCorrectCwd(cwd: string): boolean {
-  return fs.existsSync(path.join(cwd, '.eslintrc.js')) || fs.existsSync(path.join(cwd, '.eslintrc.cjs'));
+  return (
+    fs.existsSync(`${cwd}/eslint.config.js`) ||
+    fs.existsSync(`${cwd}/eslint.config.cjs`) ||
+    fs.existsSync(`${cwd}/eslint.config.mjs`) ||
+    fs.existsSync(`${cwd}/.eslintrc.js`) ||
+    fs.existsSync(`${cwd}/.eslintrc.cjs`)
+  );
 }

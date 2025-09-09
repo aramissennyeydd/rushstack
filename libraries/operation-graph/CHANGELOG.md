@@ -1,6 +1,157 @@
 # Change Log - @rushstack/operation-graph
 
-This log was last generated on Sat, 24 Feb 2024 23:02:51 GMT and should not be manually modified.
+This log was last generated on Wed, 23 Jul 2025 20:55:57 GMT and should not be manually modified.
+
+## 0.3.1
+Wed, 23 Jul 2025 20:55:57 GMT
+
+_Version update only_
+
+## 0.3.0
+Sat, 21 Jun 2025 00:13:15 GMT
+
+### Minor changes
+
+- (BREAKING CHANGE) The OperationExecutionManager `beforeExecute` and `afterExecute` hooks have been made async and renamed to `beforeExecuteAsync` and `afterExecuteAsync`. Operations now have an optional `metadata` field that can be used to store arbitrary data.
+
+## 0.2.41
+Thu, 01 May 2025 00:11:12 GMT
+
+_Version update only_
+
+## 0.2.40
+Tue, 25 Mar 2025 15:11:15 GMT
+
+_Version update only_
+
+## 0.2.39
+Tue, 11 Mar 2025 02:12:33 GMT
+
+_Version update only_
+
+## 0.2.38
+Wed, 12 Feb 2025 01:10:52 GMT
+
+_Version update only_
+
+## 0.2.37
+Thu, 30 Jan 2025 01:11:42 GMT
+
+_Version update only_
+
+## 0.2.36
+Thu, 09 Jan 2025 01:10:10 GMT
+
+_Version update only_
+
+## 0.2.35
+Sat, 14 Dec 2024 01:11:07 GMT
+
+_Version update only_
+
+## 0.2.34
+Fri, 22 Nov 2024 01:10:43 GMT
+
+_Version update only_
+
+## 0.2.33
+Fri, 13 Sep 2024 00:11:43 GMT
+
+_Version update only_
+
+## 0.2.32
+Tue, 10 Sep 2024 20:08:11 GMT
+
+_Version update only_
+
+## 0.2.31
+Wed, 21 Aug 2024 05:43:04 GMT
+
+_Version update only_
+
+## 0.2.30
+Mon, 12 Aug 2024 22:16:04 GMT
+
+_Version update only_
+
+## 0.2.29
+Sat, 27 Jul 2024 00:10:27 GMT
+
+### Patches
+
+- Include CHANGELOG.md in published releases again
+
+## 0.2.28
+Wed, 17 Jul 2024 06:55:10 GMT
+
+_Version update only_
+
+## 0.2.27
+Wed, 17 Jul 2024 00:11:19 GMT
+
+### Patches
+
+- Handle errors when sending IPC messages to host.
+
+## 0.2.26
+Tue, 16 Jul 2024 00:36:21 GMT
+
+_Version update only_
+
+## 0.2.25
+Thu, 30 May 2024 00:13:05 GMT
+
+_Version update only_
+
+## 0.2.24
+Wed, 29 May 2024 02:03:51 GMT
+
+_Version update only_
+
+## 0.2.23
+Tue, 28 May 2024 15:10:09 GMT
+
+_Version update only_
+
+## 0.2.22
+Tue, 28 May 2024 00:09:47 GMT
+
+_Version update only_
+
+## 0.2.21
+Sat, 25 May 2024 04:54:07 GMT
+
+_Version update only_
+
+## 0.2.20
+Thu, 23 May 2024 02:26:56 GMT
+
+_Version update only_
+
+## 0.2.19
+Wed, 15 May 2024 23:42:58 GMT
+
+_Version update only_
+
+## 0.2.18
+Wed, 15 May 2024 06:04:17 GMT
+
+_Version update only_
+
+## 0.2.17
+Fri, 10 May 2024 05:33:34 GMT
+
+_Version update only_
+
+## 0.2.16
+Mon, 06 May 2024 15:11:05 GMT
+
+_Version update only_
+
+## 0.2.15
+Wed, 10 Apr 2024 15:10:08 GMT
+
+_Version update only_
 
 ## 0.2.14
 Sat, 24 Feb 2024 23:02:51 GMT

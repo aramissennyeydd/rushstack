@@ -1,6 +1,350 @@
 # Change Log - @rushstack/webpack-preserve-dynamic-require-plugin
 
-This log was last generated on Tue, 05 Mar 2024 01:19:24 GMT and should not be manually modified.
+This log was last generated on Fri, 01 Aug 2025 00:12:49 GMT and should not be manually modified.
+
+## 0.11.105
+Fri, 01 Aug 2025 00:12:49 GMT
+
+_Version update only_
+
+## 0.11.104
+Wed, 23 Jul 2025 20:55:57 GMT
+
+_Version update only_
+
+## 0.11.103
+Sat, 21 Jun 2025 00:13:15 GMT
+
+_Version update only_
+
+## 0.11.102
+Tue, 13 May 2025 02:09:20 GMT
+
+_Version update only_
+
+## 0.11.101
+Thu, 01 May 2025 15:11:33 GMT
+
+_Version update only_
+
+## 0.11.100
+Thu, 01 May 2025 00:11:12 GMT
+
+_Version update only_
+
+## 0.11.99
+Fri, 25 Apr 2025 00:11:32 GMT
+
+_Version update only_
+
+## 0.11.98
+Mon, 21 Apr 2025 22:24:25 GMT
+
+_Version update only_
+
+## 0.11.97
+Thu, 17 Apr 2025 00:11:21 GMT
+
+_Version update only_
+
+## 0.11.96
+Tue, 15 Apr 2025 15:11:58 GMT
+
+_Version update only_
+
+## 0.11.95
+Wed, 09 Apr 2025 00:11:03 GMT
+
+_Version update only_
+
+## 0.11.94
+Fri, 04 Apr 2025 18:34:35 GMT
+
+_Version update only_
+
+## 0.11.93
+Tue, 25 Mar 2025 15:11:16 GMT
+
+_Version update only_
+
+## 0.11.92
+Wed, 12 Mar 2025 22:41:36 GMT
+
+_Version update only_
+
+## 0.11.91
+Wed, 12 Mar 2025 00:11:32 GMT
+
+_Version update only_
+
+## 0.11.90
+Tue, 11 Mar 2025 02:12:34 GMT
+
+_Version update only_
+
+## 0.11.89
+Tue, 11 Mar 2025 00:11:25 GMT
+
+_Version update only_
+
+## 0.11.88
+Sat, 01 Mar 2025 05:00:09 GMT
+
+_Version update only_
+
+## 0.11.87
+Thu, 27 Feb 2025 01:10:39 GMT
+
+_Version update only_
+
+## 0.11.86
+Wed, 26 Feb 2025 16:11:12 GMT
+
+_Version update only_
+
+## 0.11.85
+Sat, 22 Feb 2025 01:11:12 GMT
+
+_Version update only_
+
+## 0.11.84
+Wed, 19 Feb 2025 18:53:48 GMT
+
+_Version update only_
+
+## 0.11.83
+Wed, 12 Feb 2025 01:10:52 GMT
+
+_Version update only_
+
+## 0.11.82
+Thu, 30 Jan 2025 16:10:36 GMT
+
+_Version update only_
+
+## 0.11.81
+Thu, 30 Jan 2025 01:11:42 GMT
+
+_Version update only_
+
+## 0.11.80
+Thu, 09 Jan 2025 01:10:10 GMT
+
+_Version update only_
+
+## 0.11.79
+Tue, 07 Jan 2025 22:17:32 GMT
+
+_Version update only_
+
+## 0.11.78
+Sat, 14 Dec 2024 01:11:07 GMT
+
+_Version update only_
+
+## 0.11.77
+Mon, 09 Dec 2024 20:31:43 GMT
+
+_Version update only_
+
+## 0.11.76
+Tue, 03 Dec 2024 16:11:08 GMT
+
+_Version update only_
+
+## 0.11.75
+Sat, 23 Nov 2024 01:18:55 GMT
+
+_Version update only_
+
+## 0.11.74
+Fri, 22 Nov 2024 01:10:43 GMT
+
+_Version update only_
+
+## 0.11.73
+Thu, 24 Oct 2024 00:15:48 GMT
+
+_Version update only_
+
+## 0.11.72
+Mon, 21 Oct 2024 18:50:10 GMT
+
+_Version update only_
+
+## 0.11.71
+Thu, 17 Oct 2024 08:35:06 GMT
+
+_Version update only_
+
+## 0.11.70
+Tue, 15 Oct 2024 00:12:32 GMT
+
+_Version update only_
+
+## 0.11.69
+Wed, 02 Oct 2024 00:11:19 GMT
+
+### Patches
+
+- Ensure compatibility with webpack 5.95.0
+
+## 0.11.68
+Tue, 01 Oct 2024 00:11:28 GMT
+
+_Version update only_
+
+## 0.11.67
+Mon, 30 Sep 2024 15:12:19 GMT
+
+_Version update only_
+
+## 0.11.66
+Fri, 13 Sep 2024 00:11:43 GMT
+
+_Version update only_
+
+## 0.11.65
+Tue, 10 Sep 2024 20:08:11 GMT
+
+_Version update only_
+
+## 0.11.64
+Wed, 21 Aug 2024 05:43:04 GMT
+
+_Version update only_
+
+## 0.11.63
+Mon, 12 Aug 2024 22:16:04 GMT
+
+_Version update only_
+
+## 0.11.62
+Fri, 02 Aug 2024 17:26:42 GMT
+
+_Version update only_
+
+## 0.11.61
+Sat, 27 Jul 2024 00:10:27 GMT
+
+### Patches
+
+- Include CHANGELOG.md in published releases again
+
+## 0.11.60
+Wed, 24 Jul 2024 00:12:15 GMT
+
+_Version update only_
+
+## 0.11.59
+Wed, 17 Jul 2024 06:55:10 GMT
+
+_Version update only_
+
+## 0.11.58
+Wed, 17 Jul 2024 00:11:19 GMT
+
+_Version update only_
+
+## 0.11.57
+Tue, 16 Jul 2024 00:36:22 GMT
+
+_Version update only_
+
+## 0.11.56
+Thu, 27 Jun 2024 21:01:36 GMT
+
+_Version update only_
+
+## 0.11.55
+Mon, 03 Jun 2024 23:43:15 GMT
+
+_Version update only_
+
+## 0.11.54
+Thu, 30 May 2024 00:13:05 GMT
+
+_Version update only_
+
+## 0.11.53
+Wed, 29 May 2024 02:03:51 GMT
+
+_Version update only_
+
+## 0.11.52
+Wed, 29 May 2024 00:10:52 GMT
+
+_Version update only_
+
+## 0.11.51
+Tue, 28 May 2024 15:10:09 GMT
+
+_Version update only_
+
+## 0.11.50
+Tue, 28 May 2024 00:09:47 GMT
+
+_Version update only_
+
+## 0.11.49
+Sat, 25 May 2024 04:54:08 GMT
+
+_Version update only_
+
+## 0.11.48
+Fri, 24 May 2024 00:15:09 GMT
+
+_Version update only_
+
+## 0.11.47
+Thu, 23 May 2024 02:26:56 GMT
+
+_Version update only_
+
+## 0.11.46
+Thu, 16 May 2024 15:10:22 GMT
+
+_Version update only_
+
+## 0.11.45
+Wed, 15 May 2024 23:42:58 GMT
+
+_Version update only_
+
+## 0.11.44
+Wed, 15 May 2024 06:04:17 GMT
+
+_Version update only_
+
+## 0.11.43
+Fri, 10 May 2024 05:33:34 GMT
+
+_Version update only_
+
+## 0.11.42
+Wed, 08 May 2024 22:23:51 GMT
+
+_Version update only_
+
+## 0.11.41
+Mon, 06 May 2024 15:11:05 GMT
+
+_Version update only_
+
+## 0.11.40
+Wed, 10 Apr 2024 15:10:09 GMT
+
+_Version update only_
+
+## 0.11.39
+Tue, 19 Mar 2024 15:10:18 GMT
+
+_Version update only_
+
+## 0.11.38
+Fri, 15 Mar 2024 00:12:41 GMT
+
+_Version update only_
 
 ## 0.11.37
 Tue, 05 Mar 2024 01:19:24 GMT

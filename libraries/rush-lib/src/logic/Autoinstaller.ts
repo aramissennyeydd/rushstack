@@ -24,7 +24,7 @@ import { LastInstallFlag } from '../api/LastInstallFlag';
 import { RushCommandLineParser } from '../cli/RushCommandLineParser';
 import type { PnpmPackageManager } from '../api/packageManager/PnpmPackageManager';
 
-interface IAutoinstallerOptions {
+export interface IAutoinstallerOptions {
   autoinstallerName: string;
   rushConfiguration: RushConfiguration;
   rushGlobalFolder: RushGlobalFolder;
@@ -86,7 +86,7 @@ export class Autoinstaller {
       );
     }
 
-    await InstallHelpers.ensureLocalPackageManager(
+    await InstallHelpers.ensureLocalPackageManagerAsync(
       this._rushConfiguration,
       this._rushGlobalFolder,
       RushConstants.defaultMaxInstallAttempts,
@@ -101,7 +101,7 @@ export class Autoinstaller {
 
     this._logIfConsoleOutputIsNotRestricted(`Acquiring lock for "${relativePathForLogs}" folder...`);
 
-    const lock: LockFile = await LockFile.acquire(autoinstallerFullPath, 'autoinstaller');
+    const lock: LockFile = await LockFile.acquireAsync(autoinstallerFullPath, 'autoinstaller');
 
     try {
       // Example: .../common/autoinstallers/my-task/.rush/temp
@@ -125,7 +125,8 @@ export class Autoinstaller {
       // Example: ../common/autoinstallers/my-task/node_modules
       const nodeModulesFolder: string = `${autoinstallerFullPath}/${RushConstants.nodeModulesFolderName}`;
       const flagPath: string = `${nodeModulesFolder}/rush-autoinstaller.flag`;
-      const isLastInstallFlagDirty: boolean = !lastInstallFlag.isValid() || !FileSystem.exists(flagPath);
+      const isLastInstallFlagDirty: boolean =
+        !(await lastInstallFlag.isValidAsync()) || !FileSystem.exists(flagPath);
 
       if (isLastInstallFlagDirty || lock.dirtyWhenAcquired) {
         if (FileSystem.exists(nodeModulesFolder)) {
@@ -134,13 +135,17 @@ export class Autoinstaller {
         }
 
         // Copy: .../common/autoinstallers/my-task/.npmrc
-        Utilities.syncNpmrc(this._rushConfiguration.commonRushConfigFolder, autoinstallerFullPath);
+        Utilities.syncNpmrc({
+          sourceNpmrcFolder: this._rushConfiguration.commonRushConfigFolder,
+          targetNpmrcFolder: autoinstallerFullPath,
+          supportEnvVarFallbackSyntax: this._rushConfiguration.isPnpm
+        });
 
         this._logIfConsoleOutputIsNotRestricted(
           `Installing dependencies under ${autoinstallerFullPath}...\n`
         );
 
-        Utilities.executeCommand({
+        await Utilities.executeCommandAsync({
           command: this._rushConfiguration.packageManagerToolFilename,
           args: ['install', '--frozen-lockfile'],
           workingDirectory: autoinstallerFullPath,
@@ -148,7 +153,7 @@ export class Autoinstaller {
         });
 
         // Create file: ../common/autoinstallers/my-task/.rush/temp/last-install.flag
-        lastInstallFlag.create();
+        await lastInstallFlag.createAsync();
 
         FileSystem.writeFile(
           flagPath,
@@ -166,7 +171,7 @@ export class Autoinstaller {
   }
 
   public async updateAsync(): Promise<void> {
-    await InstallHelpers.ensureLocalPackageManager(
+    await InstallHelpers.ensureLocalPackageManagerAsync(
       this._rushConfiguration,
       this._rushGlobalFolder,
       RushConstants.defaultMaxInstallAttempts,
@@ -189,7 +194,7 @@ export class Autoinstaller {
       oldFileContents = FileSystem.readFile(this.shrinkwrapFilePath, { convertLineEndings: NewlineKind.Lf });
       this._logIfConsoleOutputIsNotRestricted('Deleting ' + this.shrinkwrapFilePath);
       await FileSystem.deleteFileAsync(this.shrinkwrapFilePath);
-      if (this._rushConfiguration.packageManager === 'pnpm') {
+      if (this._rushConfiguration.isPnpm) {
         // Workaround for https://github.com/pnpm/pnpm/issues/1890
         //
         // When "rush update-autoinstaller" is run, Rush deletes "common/autoinstallers/my-task/pnpm-lock.yaml"
@@ -216,9 +221,13 @@ export class Autoinstaller {
 
     this._logIfConsoleOutputIsNotRestricted();
 
-    Utilities.syncNpmrc(this._rushConfiguration.commonRushConfigFolder, this.folderFullPath);
+    Utilities.syncNpmrc({
+      sourceNpmrcFolder: this._rushConfiguration.commonRushConfigFolder,
+      targetNpmrcFolder: this.folderFullPath,
+      supportEnvVarFallbackSyntax: this._rushConfiguration.isPnpm
+    });
 
-    Utilities.executeCommand({
+    await Utilities.executeCommandAsync({
       command: this._rushConfiguration.packageManagerToolFilename,
       args: ['install'],
       workingDirectory: this.folderFullPath,
@@ -229,7 +238,7 @@ export class Autoinstaller {
 
     if (this._rushConfiguration.packageManager === 'npm') {
       this._logIfConsoleOutputIsNotRestricted(Colorize.bold('Running "npm shrinkwrap"...'));
-      Utilities.executeCommand({
+      await Utilities.executeCommandAsync({
         command: this._rushConfiguration.packageManagerToolFilename,
         args: ['shrinkwrap'],
         workingDirectory: this.folderFullPath,

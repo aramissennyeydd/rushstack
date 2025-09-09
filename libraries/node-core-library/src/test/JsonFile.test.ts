@@ -4,7 +4,6 @@
 import { JsonFile } from '../JsonFile';
 
 // The PosixModeBits are intended to be used with bitwise operations.
-/* eslint-disable no-bitwise */
 
 describe(JsonFile.name, () => {
   it('adds a header comment', () => {
@@ -66,5 +65,16 @@ describe(JsonFile.name, () => {
     expect(
       JsonFile.updateString(`{\n  // comment\n  a: 1,\n}`, { a: 1, b: 2, 'c-123': 3 })
     ).toMatchSnapshot();
+  });
+
+  it('supports parsing keys that map to `Object` properties', () => {
+    const propertyStrings: string[] = [];
+    for (const objectKey of Object.getOwnPropertyNames(Object.prototype).sort()) {
+      propertyStrings.push(`"${objectKey}": 1`);
+    }
+
+    const jsonString: string = `{\n  ${propertyStrings.join(',\n  ')}\n}`;
+    expect(jsonString).toMatchSnapshot('JSON String');
+    expect(JsonFile.parseString(jsonString)).toMatchSnapshot('Parsed JSON Object');
   });
 });

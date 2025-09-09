@@ -5,8 +5,19 @@ import {
   DeviceCodeCredential,
   type DeviceCodeInfo,
   AzureAuthorityHosts,
-  type DeviceCodeCredentialOptions
+  type DeviceCodeCredentialOptions,
+  type InteractiveBrowserCredentialInBrowserOptions,
+  InteractiveBrowserCredential,
+  type InteractiveBrowserCredentialNodeOptions,
+  type TokenCredential,
+  ChainedTokenCredential,
+  VisualStudioCodeCredential,
+  AzureCliCredential,
+  AzureDeveloperCliCredential,
+  AzurePowerShellCredential
 } from '@azure/identity';
+import type { TokenCredentialOptions } from '@azure/identity';
+import { AdoCodespacesAuthCredential } from './AdoCodespacesAuthCredential';
 import type { ITerminal } from '@rushstack/terminal';
 import { CredentialCache } from '@rushstack/rush-sdk';
 // Use a separate import line so the .d.ts file ends up with an `import type { ... }`
@@ -75,9 +86,48 @@ export type AzureEnvironmentName = keyof typeof AzureAuthorityHosts;
 /**
  * @public
  */
+export type LoginFlowType =
+  | 'DeviceCode'
+  | 'InteractiveBrowser'
+  | 'AdoCodespacesAuth'
+  | 'VisualStudioCode'
+  | 'AzureCli'
+  | 'AzureDeveloperCli'
+  | 'AzurePowerShell';
+
+/**
+ * @public
+ */
+export type LoginFlowFailoverMap = {
+  readonly [LoginFlow in LoginFlowType]?: Exclude<LoginFlowType, LoginFlow>;
+};
+
+/**
+ * @public
+ */
 export interface IAzureAuthenticationBaseOptions {
   azureEnvironment?: AzureEnvironmentName;
   credentialUpdateCommandForLogging?: string | undefined;
+  loginFlow?: LoginFlowType;
+  /**
+   * A map to define the failover order for login flows. When a login flow fails to get a credential,
+   * the next login flow in the map will be attempted. If the login flow fails and there is no next
+   * login flow, the error will be thrown.
+   *
+   * @defaultValue
+   * ```json
+   * {
+   *   "AdoCodespacesAuth": "VisualStudioCode",
+   *   "VisualStudioCode": "AzureCli",
+   *   "AzureCli": "AzureDeveloperCli",
+   *   "AzureDeveloperCli": "AzurePowerShell",
+   *   "AzurePowerShell": "InteractiveBrowser",
+   *   "InteractiveBrowser": "DeviceCode",
+   *   "DeviceCode": undefined
+   * }
+   * ```
+   */
+  loginFlowFailover?: LoginFlowFailoverMap;
 }
 
 /**
@@ -96,11 +146,20 @@ export abstract class AzureAuthenticationBase {
   protected abstract readonly _credentialKindForLogging: string;
   protected readonly _credentialUpdateCommandForLogging: string | undefined;
   protected readonly _additionalDeviceCodeCredentialOptions: DeviceCodeCredentialOptions | undefined;
+  protected readonly _additionalInteractiveCredentialOptions:
+    | InteractiveBrowserCredentialNodeOptions
+    | undefined;
 
   protected readonly _azureEnvironment: AzureEnvironmentName;
+  protected readonly _loginFlow: LoginFlowType;
+  protected readonly _failoverOrder:
+    | {
+        [key in LoginFlowType]?: LoginFlowType;
+      }
+    | undefined;
 
   private __credentialCacheId: string | undefined;
-  private get _credentialCacheId(): string {
+  protected get _credentialCacheId(): string {
     if (!this.__credentialCacheId) {
       const cacheIdParts: string[] = [
         this._credentialNameForCache,
@@ -115,8 +174,22 @@ export abstract class AzureAuthenticationBase {
   }
 
   public constructor(options: IAzureAuthenticationBaseOptions) {
-    this._azureEnvironment = options.azureEnvironment || 'AzurePublicCloud';
+    const {
+      azureEnvironment = 'AzurePublicCloud',
+      loginFlow = process.env.CODESPACES === 'true' ? 'AdoCodespacesAuth' : 'VisualStudioCode'
+    } = options;
+    this._azureEnvironment = azureEnvironment;
     this._credentialUpdateCommandForLogging = options.credentialUpdateCommandForLogging;
+    this._loginFlow = loginFlow;
+    this._failoverOrder = options.loginFlowFailover || {
+      AdoCodespacesAuth: 'VisualStudioCode',
+      VisualStudioCode: 'AzureCli',
+      AzureCli: 'AzureDeveloperCli',
+      AzureDeveloperCli: 'AzurePowerShell',
+      AzurePowerShell: 'InteractiveBrowser',
+      InteractiveBrowser: 'DeviceCode',
+      DeviceCode: undefined
+    };
   }
 
   public async updateCachedCredentialAsync(terminal: ITerminal, credential: string): Promise<void> {
@@ -137,31 +210,35 @@ export abstract class AzureAuthenticationBase {
    * Launches an interactive flow to renew a cached credential.
    *
    * @param terminal - The terminal to log output to
-   * @param onlyIfExistingCredentialExpiresAfter - If specified, and a cached credential exists that is still valid
-   * after the date specified, no action will be taken.
+   * @param onlyIfExistingCredentialExpiresBefore - If specified, and a cached credential exists, action will only
+   * be taken if the cached credential expires before the specified date.
    */
   public async updateCachedCredentialInteractiveAsync(
     terminal: ITerminal,
-    onlyIfExistingCredentialExpiresAfter?: Date
+    onlyIfExistingCredentialExpiresBefore?: Date
   ): Promise<void> {
     await CredentialCache.usingAsync(
       {
         supportEditing: true
       },
       async (credentialsCache: CredentialCache) => {
-        if (onlyIfExistingCredentialExpiresAfter) {
+        if (onlyIfExistingCredentialExpiresBefore) {
           const existingCredentialExpiration: Date | undefined = credentialsCache.tryGetCacheEntry(
             this._credentialCacheId
           )?.expires;
           if (
             existingCredentialExpiration &&
-            existingCredentialExpiration > onlyIfExistingCredentialExpiresAfter
+            existingCredentialExpiration > onlyIfExistingCredentialExpiresBefore
           ) {
             return;
           }
         }
 
-        const credential: ICredentialResult = await this._getCredentialAsync(terminal);
+        const credential: ICredentialResult = await this._getCredentialAsync(
+          terminal,
+          this._loginFlow,
+          credentialsCache
+        );
         credentialsCache.setCacheEntry(this._credentialCacheId, {
           credential: credential.credentialString,
           expires: credential.expiresOn,
@@ -233,25 +310,84 @@ export abstract class AzureAuthenticationBase {
    */
   protected abstract _getCacheIdParts(): string[];
 
-  protected abstract _getCredentialFromDeviceCodeAsync(
+  protected abstract _getCredentialFromTokenAsync(
     terminal: ITerminal,
-    deviceCodeCredential: DeviceCodeCredential
+    tokenCredential: TokenCredential,
+    credentialsCache: CredentialCache
   ): Promise<ICredentialResult>;
 
-  private async _getCredentialAsync(terminal: ITerminal): Promise<ICredentialResult> {
+  private async _getCredentialAsync(
+    terminal: ITerminal,
+    loginFlow: LoginFlowType,
+    credentialsCache: CredentialCache
+  ): Promise<ICredentialResult> {
     const authorityHost: string | undefined = AzureAuthorityHosts[this._azureEnvironment];
     if (!authorityHost) {
       throw new Error(`Unexpected Azure environment: ${this._azureEnvironment}`);
     }
 
-    const deviceCodeCredential: DeviceCodeCredential = new DeviceCodeCredential({
+    const interactiveCredentialOptions: (
+      | InteractiveBrowserCredentialNodeOptions
+      | InteractiveBrowserCredentialInBrowserOptions
+    ) &
+      DeviceCodeCredentialOptions = {
+      ...this._additionalInteractiveCredentialOptions,
+      authorityHost
+    };
+
+    const deviceCodeCredentialOptions: DeviceCodeCredentialOptions = {
       ...this._additionalDeviceCodeCredentialOptions,
-      authorityHost: authorityHost,
+      ...interactiveCredentialOptions,
       userPromptCallback: (deviceCodeInfo: DeviceCodeInfo) => {
         PrintUtilities.printMessageInBox(deviceCodeInfo.message, terminal);
       }
-    });
+    };
 
-    return await this._getCredentialFromDeviceCodeAsync(terminal, deviceCodeCredential);
+    const options: TokenCredentialOptions = { authorityHost };
+    const priority: Set<LoginFlowType> = new Set([loginFlow]);
+    for (const credType of priority) {
+      const next: LoginFlowType | undefined = this._failoverOrder?.[credType];
+      if (next) {
+        priority.add(next);
+      }
+    }
+
+    const knownCredentialTypes: Record<
+      LoginFlowType,
+      new (options: TokenCredentialOptions) => TokenCredential
+    > = {
+      DeviceCode: class extends DeviceCodeCredential {
+        public new(credentialOptions: DeviceCodeCredentialOptions): DeviceCodeCredential {
+          return new DeviceCodeCredential({
+            ...deviceCodeCredentialOptions,
+            ...credentialOptions
+          });
+        }
+      },
+      InteractiveBrowser: class extends InteractiveBrowserCredential {
+        public new(credentialOptions: InteractiveBrowserCredentialNodeOptions): InteractiveBrowserCredential {
+          return new InteractiveBrowserCredential({ ...interactiveCredentialOptions, ...credentialOptions });
+        }
+      },
+      AdoCodespacesAuth: AdoCodespacesAuthCredential,
+      VisualStudioCode: VisualStudioCodeCredential,
+      AzureCli: AzureCliCredential,
+      AzureDeveloperCli: AzureDeveloperCliCredential,
+      AzurePowerShell: AzurePowerShellCredential
+    };
+
+    const credentials: TokenCredential[] = Array.from(
+      priority,
+      (credType) => new knownCredentialTypes[credType](options)
+    );
+
+    const tokenCredential: TokenCredential = new ChainedTokenCredential(...credentials);
+
+    try {
+      return await this._getCredentialFromTokenAsync(terminal, tokenCredential, credentialsCache);
+    } catch (error) {
+      terminal.writeVerbose(`Failed to get credentials with ${loginFlow}: ${error}`);
+      throw error;
+    }
   }
 }

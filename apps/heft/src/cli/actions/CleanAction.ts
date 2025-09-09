@@ -76,10 +76,12 @@ export class CleanAction extends CommandLineAction implements IHeftAction {
     return this._selectedPhases;
   }
 
-  protected async onExecute(): Promise<void> {
+  protected override async onExecuteAsync(): Promise<void> {
     const { heftConfiguration } = this._internalHeftSession;
     const abortSignal: AbortSignal = ensureCliAbortSignal(this._terminal);
 
+    // Record this as the start of task execution.
+    this._metricsCollector.setStartTime();
     initializeHeft(heftConfiguration, this._terminal, this._verboseFlag.value);
     await runWithLoggingAsync(
       this._cleanFilesAsync.bind(this),

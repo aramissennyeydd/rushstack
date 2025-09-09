@@ -2,33 +2,45 @@
 // See LICENSE in the project root for license information.
 
 import fs from 'fs';
+import {
+  ESLINT_BULK_FORCE_REGENERATE_PATCH_ENV_VAR_NAME,
+  ESLINT_BULK_PATCH_PATH_ENV_VAR_NAME
+} from './constants';
 
 /**
  * Dynamically generate file to properly patch many versions of ESLint
- * @param inputFilePath Must be an iteration of https://github.com/eslint/eslint/blob/main/lib/linter/linter.js
- * @param outputFilePath Some small changes to linter.js
+ * @param inputFilePath - Must be an iteration of https://github.com/eslint/eslint/blob/main/lib/linter/linter.js
+ * @param outputFilePath - Some small changes to linter.js
  */
-export function generatePatchedFileIfDoesntExist(inputFilePath: string, outputFilePath: string): void {
-  if (fs.existsSync(outputFilePath)) {
+export function generatePatchedLinterJsFileIfDoesNotExist(
+  inputFilePath: string,
+  outputFilePath: string,
+  eslintPackageVersion: string
+): void {
+  const generateEnvVarValue: string | undefined =
+    process.env[ESLINT_BULK_FORCE_REGENERATE_PATCH_ENV_VAR_NAME];
+  if (generateEnvVarValue !== 'true' && generateEnvVarValue !== '1' && fs.existsSync(outputFilePath)) {
     return;
   }
 
-  const inputFile = fs.readFileSync(inputFilePath).toString();
+  const majorVersion: number = parseInt(eslintPackageVersion, 10);
 
-  let inputIndex = 0;
+  const inputFile: string = fs.readFileSync(inputFilePath).toString();
+
+  let inputIndex: number = 0;
 
   /**
    * Extract from the stream until marker is reached.  When matching marker,
    * ignore whitespace in the stream and in the marker.  Return the extracted text.
    */
   function scanUntilMarker(marker: string): string {
-    const trimmedMarker = marker.replace(/\s/g, '');
+    const trimmedMarker: string = marker.replace(/\s/g, '');
 
-    let output = '';
-    let trimmed = '';
+    let output: string = '';
+    let trimmed: string = '';
 
     while (inputIndex < inputFile.length) {
-      const char = inputFile[inputIndex++];
+      const char: string = inputFile[inputIndex++];
       output += char;
       if (!/^\s$/.test(char)) {
         trimmed += char;
@@ -42,10 +54,10 @@ export function generatePatchedFileIfDoesntExist(inputFilePath: string, outputFi
   }
 
   function scanUntilNewline(): string {
-    let output = '';
+    let output: string = '';
 
     while (inputIndex < inputFile.length) {
-      const char = inputFile[inputIndex++];
+      const char: string = inputFile[inputIndex++];
       output += char;
       if (char === '\n') {
         return output;
@@ -56,55 +68,64 @@ export function generatePatchedFileIfDoesntExist(inputFilePath: string, outputFi
   }
 
   function scanUntilEnd(): string {
-    const output = inputFile.substring(inputIndex);
+    const output: string = inputFile.substring(inputIndex);
     inputIndex = inputFile.length;
     return output;
   }
 
+  const markerForStartOfClassMethodSpaces: string = '\n     */\n    ';
+  const markerForStartOfClassMethodTabs: string = '\n\t */\n\t';
+  function indexOfStartOfClassMethod(input: string, position?: number): { index: number; marker?: string } {
+    let startOfClassMethodIndex: number = input.indexOf(markerForStartOfClassMethodSpaces, position);
+    if (startOfClassMethodIndex === -1) {
+      startOfClassMethodIndex = input.indexOf(markerForStartOfClassMethodTabs, position);
+      if (startOfClassMethodIndex === -1) {
+        return { index: startOfClassMethodIndex };
+      }
+      return { index: startOfClassMethodIndex, marker: markerForStartOfClassMethodTabs };
+    }
+    return { index: startOfClassMethodIndex, marker: markerForStartOfClassMethodSpaces };
+  }
+
   /**
    * Returns index of next public method
-   * @param {number} fromIndex index of inputFile to search if public method still exists
-   * @returns {number} -1 if public method does not exist or index of next public method
+   * @param fromIndex - index of inputFile to search if public method still exists
+   * @returns -1 if public method does not exist or index of next public method
    */
-  function getIndexOfNextPublicMethod(fromIndex: number): number {
-    const rest = inputFile.substring(fromIndex);
+  function getIndexOfNextMethod(fromIndex: number): { index: number; isPublic?: boolean } {
+    const rest: string = inputFile.substring(fromIndex);
 
-    const endOfClassIndex = rest.indexOf('\n}');
+    const endOfClassIndex: number = rest.indexOf('\n}');
 
-    const markerForStartOfClassMethod = '\n     */\n    ';
+    const { index: startOfClassMethodIndex, marker: startOfClassMethodMarker } =
+      indexOfStartOfClassMethod(rest);
 
-    const startOfClassMethodIndex = rest.indexOf(markerForStartOfClassMethod);
-
-    if (startOfClassMethodIndex === -1 || startOfClassMethodIndex > endOfClassIndex) {
-      return -1;
+    if (
+      startOfClassMethodIndex === -1 ||
+      !startOfClassMethodMarker ||
+      startOfClassMethodIndex > endOfClassIndex
+    ) {
+      return { index: -1 };
     }
 
-    let afterMarkerIndex = rest.indexOf(markerForStartOfClassMethod) + markerForStartOfClassMethod.length;
+    const afterMarkerIndex: number = startOfClassMethodIndex + startOfClassMethodMarker.length;
 
-    const isPublicMethod =
+    const isPublicMethod: boolean =
       rest[afterMarkerIndex] !== '_' &&
       rest[afterMarkerIndex] !== '#' &&
       !rest.substring(afterMarkerIndex, rest.indexOf('\n', afterMarkerIndex)).includes('static') &&
       !rest.substring(afterMarkerIndex, rest.indexOf('\n', afterMarkerIndex)).includes('constructor');
 
-    if (isPublicMethod) {
-      return fromIndex + afterMarkerIndex;
-    }
-
-    return getIndexOfNextPublicMethod(fromIndex + afterMarkerIndex);
+    return { index: fromIndex + afterMarkerIndex, isPublic: isPublicMethod };
   }
 
-  /**
-   * @param {number} indexToScanTo
-   * @returns {string}
-   */
   function scanUntilIndex(indexToScanTo: number): string {
-    const output = inputFile.substring(inputIndex, indexToScanTo);
+    const output: string = inputFile.substring(inputIndex, indexToScanTo);
     inputIndex = indexToScanTo;
     return output;
   }
 
-  let outputFile = '';
+  let outputFile: string = '';
 
   // Match this:
   //    //------------------------------------------------------------------------------
@@ -116,7 +137,7 @@ export function generatePatchedFileIfDoesntExist(inputFilePath: string, outputFi
 
   outputFile += `
 // --- BEGIN MONKEY PATCH ---
-const bulkSuppressionsPatch = require('../../bulk-suppressions-patch');
+const bulkSuppressionsPatch = require(process.env.${ESLINT_BULK_PATCH_PATH_ENV_VAR_NAME});
 const requireFromPathToLinterJS = bulkSuppressionsPatch.requireFromPathToLinterJS;
 `;
 
@@ -124,7 +145,7 @@ const requireFromPathToLinterJS = bulkSuppressionsPatch.requireFromPathToLinterJ
   //    //------------------------------------------------------------------------------
   //    // Typedefs
   //    //------------------------------------------------------------------------------
-  const requireSection = scanUntilMarker('// Typedefs');
+  const requireSection: string = scanUntilMarker('// Typedefs');
 
   // Match something like this:
   //
@@ -139,7 +160,7 @@ const requireFromPathToLinterJS = bulkSuppressionsPatch.requireFromPathToLinterJ
   //    evk = requireFromPathToLinterJS('eslint-visitor-keys'),
   //
   outputFile += requireSection.replace(/require\s*\((?:'([^']+)'|"([^"]+)")\)/g, (match, p1, p2) => {
-    const importPath = p1 ?? p2 ?? '';
+    const importPath: string = p1 ?? p2 ?? '';
 
     if (importPath !== 'path') {
       if (p1) {
@@ -156,82 +177,82 @@ const requireFromPathToLinterJS = bulkSuppressionsPatch.requireFromPathToLinterJ
   outputFile += `--- END MONKEY PATCH ---
 `;
 
-  // Match this:
-  //    const ruleContext = Object.freeze(
-  //      Object.assign(Object.create(sharedTraversalContext), {
-  //        id: ruleId,
-  //        options: getRuleOptions(configuredRules[ruleId]),
-  //        report(...args) {
-  //          /*
-  //           * Create a report translator lazily.
-  //
-  // Convert to something like this:
-  //
-  //    const ruleContext = Object.freeze(
-  //      Object.assign(Object.create(sharedTraversalContext), {
-  //        id: ruleId,
-  //        options: getRuleOptions(configuredRules[ruleId]),
-  //        report(...args) {
-  //          if (bulkSuppressionsPatch.shouldBulkSuppress({ filename, currentNode, ruleId })) return;
-  //          /*
-  //           * Create a report translator lazily.
-  //
-  outputFile += scanUntilMarker('const ruleContext = Object.freeze(');
-  outputFile += scanUntilMarker('report(...args) {');
-  outputFile += scanUntilNewline();
-  outputFile += `
-                        // --- BEGIN MONKEY PATCH ---
-                        if (bulkSuppressionsPatch.shouldBulkSuppress({ filename, currentNode, ruleId })) return;
-                        // --- END MONKEY PATCH ---
-`;
+  if (majorVersion >= 9) {
+    outputFile += scanUntilMarker('const emitter = createEmitter();');
+    outputFile += `
+      // --- BEGIN MONKEY PATCH ---
+      let currentNode = undefined;
+      // --- END MONKEY PATCH ---`;
+  }
 
   // Match this:
-  // nodeQueue.forEach((traversalInfo) => {
-  //   currentNode = traversalInfo.node;
+  // ```
+  //      if (reportTranslator === null) {
+  //        reportTranslator = createReportTranslator({
+  //            ruleId,
+  //            severity,
+  //            sourceCode,
+  //            messageIds,
+  //            disableFixes
+  //        });
+  //    }
+  //    const problem = reportTranslator(...args);
   //
-  //   try {
-  //     if (traversalInfo.isEntering) {
-  //       eventGenerator.enterNode(currentNode);
-  //     } else {
-  //       eventGenerator.leaveNode(currentNode);
-  //     }
-  //   } catch (err) {
-  //     err.currentNode = currentNode;
-  //     throw err;
-  //   }
-  // });
+  //    if (problem.fix && !(rule.meta && rule.meta.fixable)) {
+  //        throw new Error("Fixable rules must set the `meta.fixable` property to \"code\" or \"whitespace\".");
+  //    }
+  // ```
   //
-  // return lintingProblems;
+  // Convert to something like this:
+  // ```
+  //      if (reportTranslator === null) {
+  //        reportTranslator = createReportTranslator({
+  //            ruleId,
+  //            severity,
+  //            sourceCode,
+  //            messageIds,
+  //            disableFixes
+  //        });
+  //    }
+  //    const problem = reportTranslator(...args);
+  //    // --- BEGIN MONKEY PATCH ---
+  //    if (bulkSuppressionsPatch.shouldBulkSuppress({ filename, currentNode: args[0]?.node ?? currentNode, ruleId, problem })) return;
+  //    // --- END MONKEY PATCH ---
   //
-  // Convert to this:
-  // nodeQueue.forEach((traversalInfo) => {
-  //   currentNode = traversalInfo.node;
-  //
-  //   try {
-  //     if (traversalInfo.isEntering) {
-  //       eventGenerator.enterNode(currentNode);
-  //     } else {
-  //       eventGenerator.leaveNode(currentNode);
-  //     }
-  //   } catch (err) {
-  //     err.currentNode = currentNode;
-  //     throw err;
-  //   }
-  // });
-  //
-  // // --- BEGIN MONKEY PATCH ---
-  // bulkSuppressionsPatch.onFinish({ filename });
-  // // --- END MONKEY PATCH ---
-  //
-  // return lintingProblems;
-  outputFile += scanUntilMarker('nodeQueue.forEach(traversalInfo => {');
-  outputFile += scanUntilMarker('});');
-  outputFile += scanUntilNewline();
+  //    if (problem.fix && !(rule.meta && rule.meta.fixable)) {
+  //        throw new Error("Fixable rules must set the `meta.fixable` property to \"code\" or \"whitespace\".");
+  //    }
+  // ```
+  outputFile += scanUntilMarker('const problem = reportTranslator(...args);');
   outputFile += `
     // --- BEGIN MONKEY PATCH ---
-    bulkSuppressionsPatch.onFinish({ filename });
-    // --- END MONKEY PATCH ---
-`;
+    if (bulkSuppressionsPatch.shouldBulkSuppress({ filename, currentNode: args[0]?.node ?? currentNode, ruleId, problem })) return;
+    // --- END MONKEY PATCH ---`;
+
+  //
+  // Match this:
+  // ```
+  //    Object.keys(ruleListeners).forEach(selector => {
+  //      ...
+  //    });
+  // ```
+  //
+  // Convert to something like this:
+  // ```
+  //    Object.keys(ruleListeners).forEach(selector => {
+  //      // --- BEGIN MONKEY PATCH ---
+  //      emitter.on(selector, (...args) => { currentNode = args[args.length - 1]; });
+  //      // --- END MONKEY PATCH ---
+  //      ...
+  //    });
+  // ```
+  if (majorVersion >= 9) {
+    outputFile += scanUntilMarker('Object.keys(ruleListeners).forEach(selector => {');
+    outputFile += `
+      // --- BEGIN MONKEY PATCH ---
+      emitter.on(selector, (...args) => { currentNode = args[args.length - 1]; });
+      // --- END MONKEY PATCH ---`;
+  }
 
   outputFile += scanUntilMarker('class Linter {');
   outputFile += scanUntilNewline();
@@ -261,18 +282,43 @@ const requireFromPathToLinterJS = bulkSuppressionsPatch.requireFromPathToLinterJ
     // --- END MONKEY PATCH ---
 `;
 
-  let indexOfNextPublicMethod = getIndexOfNextPublicMethod(inputIndex);
-  while (indexOfNextPublicMethod !== -1) {
-    outputFile += scanUntilIndex(indexOfNextPublicMethod);
-    outputFile += scanUntilNewline();
-    outputFile += `        // --- BEGIN MONKEY PATCH ---
+  const privateMethodNames: string[] = [];
+  let { index: indexOfNextMethod, isPublic } = getIndexOfNextMethod(inputIndex);
+
+  while (indexOfNextMethod !== -1) {
+    outputFile += scanUntilIndex(indexOfNextMethod);
+    if (isPublic) {
+      // Inject the monkey patch at the start of the public method
+      outputFile += scanUntilNewline();
+      outputFile += `        // --- BEGIN MONKEY PATCH ---
         this._conditionallyReinitialize();
         // --- END MONKEY PATCH ---
 `;
-    indexOfNextPublicMethod = getIndexOfNextPublicMethod(inputIndex);
+    } else if (inputFile[inputIndex] === '#') {
+      // Replace the '#' private method with a '_' private method, so that our monkey patch
+      // can still call it. Otherwise, we get the following error during execution:
+      // TypeError: Receiver must be an instance of class Linter
+      const privateMethodName: string = scanUntilMarker('(');
+      // Remove the '(' at the end and stash it, since we need to escape it for the regex later
+      privateMethodNames.push(privateMethodName.slice(0, -1));
+      outputFile += `_${privateMethodName.slice(1)}`;
+    }
+
+    const indexResult: { index: number; isPublic?: boolean } = getIndexOfNextMethod(inputIndex);
+    indexOfNextMethod = indexResult.index;
+    isPublic = indexResult.isPublic;
   }
 
   outputFile += scanUntilEnd();
+
+  // Do a second pass to find and replace all calls to private methods with the patched versions.
+  if (privateMethodNames.length) {
+    const privateMethodCallRegex: RegExp = new RegExp(`\.(${privateMethodNames.join('|')})\\(`, 'g');
+    outputFile = outputFile.replace(privateMethodCallRegex, (match, privateMethodName) => {
+      // Replace the leading '#' with a leading '_'
+      return `._${privateMethodName.slice(1)}(`;
+    });
+  }
 
   fs.writeFileSync(outputFilePath, outputFile);
 }

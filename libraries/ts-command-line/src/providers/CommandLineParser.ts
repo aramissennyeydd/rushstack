@@ -13,6 +13,8 @@ import {
 } from './CommandLineParameterProvider';
 import { CommandLineParserExitError, CustomArgumentParser } from './CommandLineParserExitError';
 import { TabCompleteAction } from './TabCompletionAction';
+import { TypeUuid, uuidAlreadyReportedError } from '../TypeUuidLite';
+import { escapeSprintf } from '../escapeSprintf';
 
 /**
  * Options for the {@link CommandLineParser} constructor.
@@ -74,17 +76,18 @@ export abstract class CommandLineParser extends CommandLineParameterProvider {
     this._actions = [];
     this._actionsByName = new Map<string, CommandLineAction>();
 
+    const { toolFilename, toolDescription, toolEpilog } = options;
+
     this._argumentParser = new CustomArgumentParser({
       addHelp: true,
-      prog: this._options.toolFilename,
-      description: this._options.toolDescription,
+      prog: toolFilename,
+      description: escapeSprintf(toolDescription),
       epilog: Colorize.bold(
-        this._options.toolEpilog ??
-          `For detailed help about a specific command, use: ${this._options.toolFilename} <command> -h`
+        escapeSprintf(
+          toolEpilog ?? `For detailed help about a specific command, use: ${toolFilename} <command> -h`
+        )
       )
     });
-
-    this.onDefineParameters?.();
   }
 
   /**
@@ -141,24 +144,24 @@ export abstract class CommandLineParser extends CommandLineParameterProvider {
    * want to be involved with the command-line logic, and will discard the promise without
    * a then() or catch() block.
    *
-   * If your caller wants to trap and handle errors, use {@link CommandLineParser.executeWithoutErrorHandling}
+   * If your caller wants to trap and handle errors, use {@link CommandLineParser.executeWithoutErrorHandlingAsync}
    * instead.
    *
    * @param args - the command-line arguments to be parsed; if omitted, then
    *               the process.argv will be used
    */
-  public async execute(args?: string[]): Promise<boolean> {
+  public async executeAsync(args?: string[]): Promise<boolean> {
     if (this._options.enableTabCompletionAction && !this._tabCompleteActionWasAdded) {
       this.addAction(new TabCompleteAction(this.actions, this.parameters));
       this._tabCompleteActionWasAdded = true;
     }
 
     try {
-      await this.executeWithoutErrorHandling(args);
+      await this.executeWithoutErrorHandlingAsync(args);
       return true;
     } catch (err) {
       if (err instanceof CommandLineParserExitError) {
-        // executeWithoutErrorHandling() handles the successful cases,
+        // executeWithoutErrorHandlingAsync() handles the successful cases,
         // so here we can assume err has a nonzero exit code
         if (err.message) {
           // eslint-disable-next-line no-console
@@ -166,6 +169,11 @@ export abstract class CommandLineParser extends CommandLineParameterProvider {
         }
         if (!process.exitCode) {
           process.exitCode = err.exitCode;
+        }
+      } else if (TypeUuid.isInstanceOf(err, uuidAlreadyReportedError)) {
+        //  AlreadyReportedError
+        if (!process.exitCode) {
+          process.exitCode = 1;
         }
       } else {
         let message: string = ((err as Error).message || 'An unknown error occurred').trim();
@@ -190,16 +198,16 @@ export abstract class CommandLineParser extends CommandLineParameterProvider {
   }
 
   /**
-   * This is similar to {@link CommandLineParser.execute}, except that execution errors
+   * This is similar to {@link CommandLineParser.executeAsync}, except that execution errors
    * simply cause the promise to reject.  It is the caller's responsibility to trap
    */
-  public async executeWithoutErrorHandling(args?: string[]): Promise<void> {
+  public async executeWithoutErrorHandlingAsync(args?: string[]): Promise<void> {
     try {
       if (this._executed) {
         // In the future we could allow the same parser to be invoked multiple times
         // with different arguments.  We'll do that work as soon as someone encounters
         // a real world need for it.
-        throw new Error('execute() was already called for this parser instance');
+        throw new Error('executeAsync() was already called for this parser instance');
       }
       this._executed = true;
 
@@ -273,7 +281,7 @@ export abstract class CommandLineParser extends CommandLineParameterProvider {
       }
 
       this.selectedAction?._processParsedData(this._options, data);
-      await this.onExecute();
+      await this.onExecuteAsync();
     } catch (err) {
       if (err instanceof CommandLineParserExitError) {
         if (!err.exitCode) {
@@ -321,8 +329,7 @@ export abstract class CommandLineParser extends CommandLineParameterProvider {
    * {@inheritDoc CommandLineParameterProvider._getArgumentParser}
    * @internal
    */
-  protected _getArgumentParser(): argparse.ArgumentParser {
-    // override
+  protected override _getArgumentParser(): argparse.ArgumentParser {
     return this._argumentParser;
   }
 
@@ -330,9 +337,9 @@ export abstract class CommandLineParser extends CommandLineParameterProvider {
    * This hook allows the subclass to perform additional operations before or after
    * the chosen action is executed.
    */
-  protected async onExecute(): Promise<void> {
+  protected async onExecuteAsync(): Promise<void> {
     if (this.selectedAction) {
-      await this.selectedAction._execute();
+      await this.selectedAction._executeAsync();
     }
   }
 }

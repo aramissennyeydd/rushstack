@@ -347,7 +347,7 @@ describe(ChangelogGenerator.updateIndividualChangelog.name, () => {
 
     const emptyObjectFileInvoke = generateUpdateInvoke(`${__dirname}/exampleInvalidChangelog/emptyObject`);
     expect(emptyObjectFileInvoke).toThrow(Error);
-    expect(emptyObjectFileInvoke).toThrow(/Missing required property: name/);
+    expect(emptyObjectFileInvoke).toThrow(/must have required property 'name'/);
   });
 });
 
@@ -359,7 +359,6 @@ describe(ChangelogGenerator.updateChangelogs.name, () => {
     rushConfiguration = RushConfiguration.loadFromConfigurationFile(rushJsonFile);
   });
 
-  /* eslint-disable dot-notation */
   it('skips changes logs if the project version is not changed.', () => {
     const allChanges: IChangeRequests = { packageChanges: new Map(), versionPolicyChanges: new Map() };
     // Package a does not have version change.
@@ -446,5 +445,4 @@ describe(ChangelogGenerator.updateChangelogs.name, () => {
     expect(updatedChangeLogs[0].name).toEqual('a');
     expect(updatedChangeLogs[1].name).toEqual('b');
   });
-  /* eslint-enable dot-notation */
 });

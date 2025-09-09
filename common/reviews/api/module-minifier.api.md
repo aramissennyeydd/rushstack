@@ -6,9 +6,10 @@
 
 /// <reference types="node" />
 
-import type { MessagePort as MessagePort_2 } from 'worker_threads';
 import { MinifyOptions } from 'terser';
 import type { RawSourceMap } from 'source-map';
+import type { ResourceLimits } from 'worker_threads';
+import type * as WorkerThreads from 'worker_threads';
 
 // @public
 export function getIdentifier(ordinal: number): string;
@@ -22,7 +23,9 @@ export interface ILocalMinifierOptions {
 // @public
 export interface IMinifierConnection {
     configHash: string;
+    // @deprecated (undocumented)
     disconnect(): Promise<void>;
+    disconnectAsync(): Promise<void>;
 }
 
 // @public
@@ -60,7 +63,9 @@ export interface IModuleMinificationSuccessResult {
 
 // @public
 export interface IModuleMinifier {
+    // @deprecated (undocumented)
     connect(): Promise<IMinifierConnection>;
+    connectAsync(): Promise<IMinifierConnection>;
     minify: IModuleMinifierFunction;
 }
 
@@ -75,24 +80,27 @@ export interface IWorkerPoolMinifierOptions {
     maxThreads?: number;
     terserOptions?: MinifyOptions;
     verbose?: boolean;
+    workerResourceLimits?: ResourceLimits;
 }
 
 // @public
 export class LocalMinifier implements IModuleMinifier {
     constructor(options: ILocalMinifierOptions);
-    // (undocumented)
+    // @deprecated (undocumented)
     connect(): Promise<IMinifierConnection>;
+    connectAsync(): Promise<IMinifierConnection>;
     minify(request: IModuleMinificationRequest, callback: IModuleMinificationCallback): void;
 }
 
 // @public
 export class MessagePortMinifier implements IModuleMinifier {
-    constructor(port: MessagePort_2);
-    // (undocumented)
+    constructor(port: WorkerThreads.MessagePort);
+    // @deprecated (undocumented)
     connect(): Promise<IMinifierConnection>;
+    connectAsync(): Promise<IMinifierConnection>;
     minify(request: IModuleMinificationRequest, callback: IModuleMinificationCallback): void;
     // (undocumented)
-    readonly port: MessagePort_2;
+    readonly port: WorkerThreads.MessagePort;
 }
 
 export { MinifyOptions }
@@ -102,16 +110,18 @@ export function _minifySingleFileAsync(request: IModuleMinificationRequest, ters
 
 // @public
 export class NoopMinifier implements IModuleMinifier {
-    // (undocumented)
+    // @deprecated (undocumented)
     connect(): Promise<IMinifierConnection>;
+    connectAsync(): Promise<IMinifierConnection>;
     minify(request: IModuleMinificationRequest, callback: IModuleMinificationCallback): void;
 }
 
 // @public
 export class WorkerPoolMinifier implements IModuleMinifier {
     constructor(options: IWorkerPoolMinifierOptions);
-    // (undocumented)
+    // @deprecated (undocumented)
     connect(): Promise<IMinifierConnection>;
+    connectAsync(): Promise<IMinifierConnection>;
     // (undocumented)
     get maxThreads(): number;
     set maxThreads(threads: number);

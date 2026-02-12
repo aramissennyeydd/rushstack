@@ -314,6 +314,17 @@ export class Subspace {
   }
 
   /**
+   * Gets the full path to the pnpm-config.json config file for this subspace.
+   *
+   * Example (subspaces feature enabled):   `C:\MyRepo\common\config\subspaces\my-subspace\pnpm-config.json`
+   * Example (subspaces feature disabled):  `C:\MyRepo\common\config\rush\pnpm-config.json`
+   * @beta
+   */
+  public getPnpmWorkspaceYamlFilePath(): string {
+    return this.getSubspaceConfigFolderPath() + '/' + RushConstants.pnpmWorkspaceYamlFilename;
+  }
+
+  /**
    * Gets the settings from the common-versions.json config file.
    * @beta
    */

@@ -197,6 +197,11 @@ export class RushConstants {
   public static readonly pnpmConfigFilename: 'pnpm-config.json' = 'pnpm-config.json';
 
   /**
+   * Pnpm workspace configuration file. Heavily relied on in pnpm 10 for providing config.
+   */
+  public static readonly pnpmWorkspaceYamlFilename: 'pnpm-workspace.yaml' = 'pnpm-workspace.yaml';
+
+  /**
    * Rush plugins configuration file name.
    */
   public static readonly rushPluginsConfigFilename: 'rush-plugins.json' = 'rush-plugins.json';

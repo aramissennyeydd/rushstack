@@ -3,7 +3,7 @@
 
 import * as path from 'node:path';
 
-import { Sort, Import, Path } from '@rushstack/node-core-library';
+import { Sort, Import, Path, FileSystem } from '@rushstack/node-core-library';
 
 import { BaseWorkspaceFile } from '../base/BaseWorkspaceFile';
 import { PNPM_SHRINKWRAP_YAML_FORMAT } from './PnpmYamlCommon';
@@ -33,6 +33,10 @@ interface IPnpmWorkspaceYaml {
   catalogs?: Record<string, Record<string, string>>;
 }
 
+interface IPnpmWorkspaceFileSettings {
+  targetPath: string;
+}
+
 export class PnpmWorkspaceFile extends BaseWorkspaceFile {
   /**
    * The filename of the workspace file.
@@ -41,19 +45,35 @@ export class PnpmWorkspaceFile extends BaseWorkspaceFile {
 
   private _workspacePackages: Set<string>;
   private _catalogs: Record<string, Record<string, string>> | undefined;
+  private _unsupportedPnpmWorkspaceYamlSettings: object;
 
   /**
    * The PNPM workspace file is used to specify the location of workspaces relative to the root
    * of your PNPM install.
    */
-  public constructor(workspaceYamlFilename: string) {
+  private constructor(userProvidedSettings: object, workspaceYamlFilename: string) {
     super();
 
+    this._unsupportedPnpmWorkspaceYamlSettings = userProvidedSettings;
     this.workspaceFilename = workspaceYamlFilename;
     // Ignore any existing file since this file is generated and we need to handle deleting packages
     // If we need to support manual customization, that should be an additional parameter for "base file"
     this._workspacePackages = new Set<string>();
     this._catalogs = undefined;
+  }
+
+  public static loadFromFile(
+    workspaceYamlFilename: string,
+    config: IPnpmWorkspaceFileSettings
+  ): PnpmWorkspaceFile {
+    if (!FileSystem.exists(workspaceYamlFilename)) {
+      return new PnpmWorkspaceFile({}, config.targetPath);
+    }
+    const parsedFileOutput: unknown = yamlModule.load(FileSystem.readFile(workspaceYamlFilename));
+    if (typeof parsedFileOutput !== 'object' || parsedFileOutput === null) {
+      throw new Error(`Invalid pnpm workspace file: ${workspaceYamlFilename}`);
+    }
+    return new PnpmWorkspaceFile(parsedFileOutput || {}, config.targetPath);
   }
 
   /**
@@ -82,6 +102,7 @@ export class PnpmWorkspaceFile extends BaseWorkspaceFile {
     Sort.sortSet(this._workspacePackages);
 
     const workspaceYaml: IPnpmWorkspaceYaml = {
+      ...this._unsupportedPnpmWorkspaceYamlSettings,
       packages: Array.from(this._workspacePackages)
     };
 

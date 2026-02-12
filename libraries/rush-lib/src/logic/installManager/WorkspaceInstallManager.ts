@@ -187,8 +187,9 @@ export class WorkspaceInstallManager extends BaseInstallManager {
     }
 
     // To generate the workspace file, we will add each project to the file as we loop through and validate
-    const workspaceFile: PnpmWorkspaceFile = new PnpmWorkspaceFile(
-      path.join(subspace.getSubspaceTempFolderPath(), 'pnpm-workspace.yaml')
+    const workspaceFile: PnpmWorkspaceFile = PnpmWorkspaceFile.loadFromFile(
+      subspace.getPnpmWorkspaceYamlFilePath(),
+      { targetPath: path.join(subspace.getSubspaceTempFolderPath(), 'pnpm-workspace.yaml') }
     );
 
     // For pnpm package manager, we need to handle dependenciesMeta changes in package.json. See more: https://pnpm.io/package_json#dependenciesmeta

@@ -1446,6 +1446,7 @@ export class RushConstants {
     static readonly pnpmSyncFilename: '.pnpm-sync.json';
     static readonly pnpmV3ShrinkwrapFilename: 'pnpm-lock.yaml';
     static readonly pnpmVirtualStoreFolderName: '.pnpm';
+    static readonly pnpmWorkspaceYamlFilename: 'pnpm-workspace.yaml';
     static readonly projectImpactGraphFilename: 'project-impact-graph.yaml';
     static readonly projectRushFolderName: '.rush';
     static readonly projectShrinkwrapFilename: 'shrinkwrap-deps.json';
@@ -1580,6 +1581,8 @@ export class Subspace {
     getPnpmfilePath(variant?: string): string;
     // @beta
     getPnpmOptions(): PnpmOptionsConfiguration | undefined;
+    // @beta
+    getPnpmWorkspaceYamlFilePath(): string;
     // @beta
     getProjects(): RushConfigurationProject[];
     // @beta

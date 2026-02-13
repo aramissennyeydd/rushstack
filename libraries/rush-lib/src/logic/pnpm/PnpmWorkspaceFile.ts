@@ -51,7 +51,7 @@ export class PnpmWorkspaceFile extends BaseWorkspaceFile {
    * The PNPM workspace file is used to specify the location of workspaces relative to the root
    * of your PNPM install.
    */
-  private constructor(userProvidedSettings: object, workspaceYamlFilename: string) {
+  public constructor(userProvidedSettings: object, workspaceYamlFilename: string) {
     super();
 
     this._unsupportedPnpmWorkspaceYamlSettings = userProvidedSettings;

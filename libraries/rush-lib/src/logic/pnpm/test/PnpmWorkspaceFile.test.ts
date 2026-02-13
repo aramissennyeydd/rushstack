@@ -48,7 +48,7 @@ describe(PnpmWorkspaceFile.name, () => {
 
   describe('basic functionality', () => {
     it('generates workspace file with packages only', () => {
-      const workspaceFile: PnpmWorkspaceFile = new PnpmWorkspaceFile(workspaceFilePath);
+      const workspaceFile: PnpmWorkspaceFile = new PnpmWorkspaceFile({}, workspaceFilePath);
       workspaceFile.addPackage(path.join(projectsDir, 'app1'));
       workspaceFile.addPackage(path.join(projectsDir, 'app2'));
 
@@ -59,7 +59,7 @@ describe(PnpmWorkspaceFile.name, () => {
     });
 
     it('escapes special characters in package paths', () => {
-      const workspaceFile: PnpmWorkspaceFile = new PnpmWorkspaceFile(workspaceFilePath);
+      const workspaceFile: PnpmWorkspaceFile = new PnpmWorkspaceFile({}, workspaceFilePath);
       workspaceFile.addPackage(path.join(projectsDir, '[app-with-brackets]'));
 
       workspaceFile.save(workspaceFilePath, { onlyIfChanged: true });
@@ -71,7 +71,7 @@ describe(PnpmWorkspaceFile.name, () => {
 
   describe('catalog functionality', () => {
     it('generates workspace file with default catalog only', () => {
-      const workspaceFile: PnpmWorkspaceFile = new PnpmWorkspaceFile(workspaceFilePath);
+      const workspaceFile: PnpmWorkspaceFile = new PnpmWorkspaceFile({}, workspaceFilePath);
       workspaceFile.addPackage(path.join(projectsDir, 'app1'));
 
       workspaceFile.setCatalogs({
@@ -89,7 +89,7 @@ describe(PnpmWorkspaceFile.name, () => {
     });
 
     it('generates workspace file with named catalogs', () => {
-      const workspaceFile: PnpmWorkspaceFile = new PnpmWorkspaceFile(workspaceFilePath);
+      const workspaceFile: PnpmWorkspaceFile = new PnpmWorkspaceFile({}, workspaceFilePath);
       workspaceFile.addPackage(path.join(projectsDir, 'app1'));
 
       workspaceFile.setCatalogs({
@@ -113,7 +113,7 @@ describe(PnpmWorkspaceFile.name, () => {
     });
 
     it('handles empty catalog object', () => {
-      const workspaceFile: PnpmWorkspaceFile = new PnpmWorkspaceFile(workspaceFilePath);
+      const workspaceFile: PnpmWorkspaceFile = new PnpmWorkspaceFile({}, workspaceFilePath);
       workspaceFile.addPackage(path.join(projectsDir, 'app1'));
 
       workspaceFile.setCatalogs({});
@@ -125,7 +125,7 @@ describe(PnpmWorkspaceFile.name, () => {
     });
 
     it('handles undefined catalog', () => {
-      const workspaceFile: PnpmWorkspaceFile = new PnpmWorkspaceFile(workspaceFilePath);
+      const workspaceFile: PnpmWorkspaceFile = new PnpmWorkspaceFile({}, workspaceFilePath);
       workspaceFile.addPackage(path.join(projectsDir, 'app1'));
 
       workspaceFile.setCatalogs(undefined);
@@ -137,7 +137,7 @@ describe(PnpmWorkspaceFile.name, () => {
     });
 
     it('handles scoped packages in catalogs', () => {
-      const workspaceFile: PnpmWorkspaceFile = new PnpmWorkspaceFile(workspaceFilePath);
+      const workspaceFile: PnpmWorkspaceFile = new PnpmWorkspaceFile({}, workspaceFilePath);
       workspaceFile.addPackage(path.join(projectsDir, 'app1'));
 
       workspaceFile.setCatalogs({
@@ -155,7 +155,7 @@ describe(PnpmWorkspaceFile.name, () => {
     });
 
     it('can update catalogs after initial creation', () => {
-      const workspaceFile: PnpmWorkspaceFile = new PnpmWorkspaceFile(workspaceFilePath);
+      const workspaceFile: PnpmWorkspaceFile = new PnpmWorkspaceFile({}, workspaceFilePath);
       workspaceFile.addPackage(path.join(projectsDir, 'app1'));
 
       workspaceFile.setCatalogs({
@@ -178,6 +178,69 @@ describe(PnpmWorkspaceFile.name, () => {
 
       const content: string = FileSystem.readFile(workspaceFilePath);
       expect(content).toMatchSnapshot();
+    });
+  });
+
+  describe('loadFromFile', () => {
+    it('loads an existing workspace file', () => {
+      // Create a workspace file first
+      const workspaceFile: PnpmWorkspaceFile = new PnpmWorkspaceFile({}, workspaceFilePath);
+      workspaceFile.addPackage(path.join(projectsDir, 'app1'));
+      workspaceFile.setCatalogs({
+        default: {
+          react: '^18.0.0'
+        }
+      });
+      workspaceFile.save(workspaceFilePath, { onlyIfChanged: true });
+
+      // Load it back
+      const loadedFile: PnpmWorkspaceFile = PnpmWorkspaceFile.loadFromFile(workspaceFilePath, {
+        targetPath: workspaceFilePath
+      });
+
+      // Add another package to verify it loaded correctly
+      loadedFile.addPackage(path.join(projectsDir, 'app2'));
+      loadedFile.save(workspaceFilePath, { onlyIfChanged: true });
+
+      const content: string = FileSystem.readFile(workspaceFilePath);
+      expect(content).toMatchSnapshot();
+    });
+
+    it('ignores file that does not exist', () => {
+      mockExists.mockReturnValue(false);
+
+      const loadedFile: PnpmWorkspaceFile = PnpmWorkspaceFile.loadFromFile(workspaceFilePath, {
+        targetPath: workspaceFilePath
+      });
+
+      loadedFile.addPackage(path.join(projectsDir, 'app1'));
+      loadedFile.save(workspaceFilePath, { onlyIfChanged: true });
+
+      const content: string = FileSystem.readFile(workspaceFilePath);
+      expect(content).toMatchSnapshot();
+    });
+
+    it('throws error for invalid YAML content', () => {
+      // Mock readFile to return invalid content
+      mockReadFile.mockReturnValue('invalid: [unclosed array');
+      mockExists.mockReturnValue(true);
+
+      expect(() => {
+        PnpmWorkspaceFile.loadFromFile(workspaceFilePath, {
+          targetPath: workspaceFilePath
+        });
+      }).toThrow();
+    });
+
+    it('throws error for non-object YAML content', () => {
+      mockReadFile.mockReturnValue('just a string');
+      mockExists.mockReturnValue(true);
+
+      expect(() => {
+        PnpmWorkspaceFile.loadFromFile(workspaceFilePath, {
+          targetPath: workspaceFilePath
+        });
+      }).toThrow('Invalid pnpm workspace file');
     });
   });
 });

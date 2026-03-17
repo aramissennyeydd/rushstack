@@ -1,0 +1,29 @@
+libraries/rush-lib/src/api/test/repoInjectedDeps/provider/package.json
+  55bc2536dc65c0da 1-10
+libraries/rush-lib/src/api/test/Subspace.test.ts
+  55bc2536dc65c0da 77-152
+libraries/rush-lib/src/api/test/repoInjectedDeps/rush.json
+  55bc2536dc65c0da 1-17
+libraries/rush-lib/src/api/test/repoInjectedDeps/consumer/package.json
+  55bc2536dc65c0da 1-12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "1ee390e629000effaa08bfbdf6ed703bda44b2a7",
+  "prompts": {
+    "55bc2536dc65c0da": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "18af21ff-adfc-4a5c-8703-f832df970a17",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Aramis Sennyey <aramissennyeydd@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 119,
+      "total_deletions": 6,
+      "accepted_lines": 116,
+      "overriden_lines": 0
+    }
+  }
+}

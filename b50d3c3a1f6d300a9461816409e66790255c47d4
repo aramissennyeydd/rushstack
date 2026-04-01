@@ -1,0 +1,31 @@
+libraries/rush-lib/src/logic/operations/OperationExecutionManager.ts
+  9090478933938e8f 151-153
+libraries/rush-lib/src/logic/operations/AsyncOperationQueue.ts
+  9090478933938e8f 89-98
+libraries/rush-lib/src/logic/operations/test/AsyncOperationQueue.test.ts
+  9090478933938e8f 171-243
+libraries/rush-lib/src/logic/operations/CacheableOperationPlugin.ts
+  9090478933938e8f 414
+libraries/rush-lib/src/logic/operations/OperationExecutionRecord.ts
+  9090478933938e8f 45,238-245
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.4",
+  "base_commit_sha": "b50d3c3a1f6d300a9461816409e66790255c47d4",
+  "prompts": {
+    "9090478933938e8f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a335aafc-c582-4928-8192-30aa2bdb77ed",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Aramis Sennyey",
+      "messages": [],
+      "total_additions": 403,
+      "total_deletions": 301,
+      "accepted_lines": 113,
+      "overriden_lines": 0
+    }
+  }
+}
